@@ -8,13 +8,13 @@ let package = Package(
         .macOS(.v15)
     ],
     dependencies: [
-        .package(url: "https://github.com/gonzalezreal/textual", from: "0.1.0")
+        .package(url: "https://github.com/LiYanan2004/MarkdownView", branch: "main")
     ],
     targets: [
         .executableTarget(
             name: "markie",
             dependencies: [
-                .product(name: "Textual", package: "textual")
+                .product(name: "MarkdownView", package: "MarkdownView")
             ],
             path: "Sources/Markie",
             linkerSettings: [

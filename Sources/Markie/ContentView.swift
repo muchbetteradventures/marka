@@ -1,14 +1,12 @@
 import SwiftUI
-import Textual
+import MarkdownView
 
 struct ContentView: View {
     let document: MarkdownDocument
 
     var body: some View {
         ScrollView {
-            StructuredText(markdown: document.markdown)
-                .textual.structuredTextStyle(.gitHub)
-                .textual.textSelection(.enabled)
+            MarkdownView(document.markdown)
                 .padding(32)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
