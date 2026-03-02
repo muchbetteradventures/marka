@@ -1,8 +1,11 @@
 import SwiftUI
 import WebKit
+import Ink
 
 struct MarkdownWebView: NSViewRepresentable {
     let document: MarkdownDocument
+
+    private static let parser = MarkdownParser()
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -17,8 +20,8 @@ struct MarkdownWebView: NSViewRepresentable {
         webView.setValue(false, forKey: "drawsBackground")
         context.coordinator.webView = webView
 
-        // Load initial content
-        let html = HTMLTemplate.fullPage(markdown: document.markdown)
+        let bodyHTML = Self.parser.html(from: document.markdown)
+        let html = HTMLTemplate.fullPage(bodyHTML: bodyHTML)
         webView.loadHTMLString(html, baseURL: document.baseURL)
         context.coordinator.lastMarkdown = document.markdown
 
@@ -29,21 +32,22 @@ struct MarkdownWebView: NSViewRepresentable {
         guard document.markdown != context.coordinator.lastMarkdown else { return }
         context.coordinator.lastMarkdown = document.markdown
 
+        let bodyHTML = Self.parser.html(from: document.markdown)
+
         if context.coordinator.pageLoaded {
-            pushMarkdownUpdate(webView: webView, markdown: document.markdown)
+            pushHTMLUpdate(webView: webView, html: bodyHTML)
         } else {
-            // Page not yet loaded, reload entirely
-            let html = HTMLTemplate.fullPage(markdown: document.markdown)
-            webView.loadHTMLString(html, baseURL: document.baseURL)
+            let fullHTML = HTMLTemplate.fullPage(bodyHTML: bodyHTML)
+            webView.loadHTMLString(fullHTML, baseURL: document.baseURL)
         }
     }
 
-    private func pushMarkdownUpdate(webView: WKWebView, markdown: String) {
-        let escaped = markdown
+    private func pushHTMLUpdate(webView: WKWebView, html: String) {
+        let escaped = html
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "`", with: "\\`")
             .replacingOccurrences(of: "$", with: "\\$")
-        webView.evaluateJavaScript("updateMarkdown(`\(escaped)`)")
+        webView.evaluateJavaScript("updateContent(`\(escaped)`)")
     }
 
     final class Coordinator: NSObject, WKNavigationDelegate {

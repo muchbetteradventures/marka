@@ -7,9 +7,15 @@ let package = Package(
     platforms: [
         .macOS(.v14)
     ],
+    dependencies: [
+        .package(url: "https://github.com/johnsundell/ink.git", from: "0.1.0")
+    ],
     targets: [
         .executableTarget(
             name: "markie",
+            dependencies: [
+                .product(name: "Ink", package: "ink")
+            ],
             path: "Sources/Markie",
             linkerSettings: [
                 .unsafeFlags(["-Xlinker", "-sectcreate",
