@@ -10,8 +10,8 @@ struct ContentView: View {
                 .textual.structuredTextStyle(.gitHub)
                 .textual.textSelection(.enabled)
                 .padding(32)
-                .frame(maxWidth: 980, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(minWidth: 400, maxWidth: .infinity, minHeight: 300, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
