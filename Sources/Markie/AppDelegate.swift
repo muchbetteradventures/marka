@@ -1,6 +1,5 @@
 import AppKit
 import SwiftUI
-import WebKit
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -57,15 +56,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         editMenuItem.submenu = editMenu
         mainMenu.addItem(editMenuItem)
 
-        // View menu
-        let viewMenuItem = NSMenuItem()
-        let viewMenu = NSMenu(title: "View")
-        viewMenu.addItem(withTitle: "Actual Size", action: #selector(actualSize), keyEquivalent: "0")
-        viewMenu.addItem(withTitle: "Zoom In", action: #selector(zoomIn), keyEquivalent: "+")
-        viewMenu.addItem(withTitle: "Zoom Out", action: #selector(zoomOut), keyEquivalent: "-")
-        viewMenuItem.submenu = viewMenu
-        mainMenu.addItem(viewMenuItem)
-
         // Window menu
         let windowMenuItem = NSMenuItem()
         let windowMenu = NSMenu(title: "Window")
@@ -76,37 +66,5 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         NSApp.mainMenu = mainMenu
         NSApp.windowsMenu = windowMenu
-    }
-
-    @objc private func actualSize() {
-        evaluateJS("document.body.style.zoom = '1'")
-    }
-
-    @objc private func zoomIn() {
-        evaluateJS("""
-            var z = parseFloat(document.body.style.zoom || '1');
-            document.body.style.zoom = String(Math.min(z + 0.1, 3));
-        """)
-    }
-
-    @objc private func zoomOut() {
-        evaluateJS("""
-            var z = parseFloat(document.body.style.zoom || '1');
-            document.body.style.zoom = String(Math.max(z - 0.1, 0.3));
-        """)
-    }
-
-    private func evaluateJS(_ js: String) {
-        guard let hostingView = window?.contentView as? NSHostingView<ContentView>,
-              let webView = findWebView(in: hostingView) else { return }
-        webView.evaluateJavaScript(js)
-    }
-
-    private func findWebView(in view: NSView) -> WKWebView? {
-        if let wv = view as? WKWebView { return wv }
-        for subview in view.subviews {
-            if let wv = findWebView(in: subview) { return wv }
-        }
-        return nil
     }
 }
