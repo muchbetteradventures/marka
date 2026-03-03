@@ -3,7 +3,7 @@ import SwiftUI
 import WebKit
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMenuItemValidation {
     private var windowInfos: [(window: NSWindow, document: MarkdownDocument, watcher: FileWatcher?, tempPath: String?)] = []
     private let ipcServer = IPCServer()
     private let initialDocument: IPCPayload
@@ -124,12 +124,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let editMenu = NSMenu(title: "Edit")
         editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
         editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        editMenu.addItem(.separator())
+        editMenu.addItem(withTitle: "Find\u{2026}", action: #selector(showFind), keyEquivalent: "f")
         editMenuItem.submenu = editMenu
         mainMenu.addItem(editMenuItem)
 
         // View menu
         let viewMenuItem = NSMenuItem()
         let viewMenu = NSMenu(title: "View")
+        let keepOnTopItem = NSMenuItem(title: "Keep on Top", action: #selector(toggleKeepOnTop), keyEquivalent: "t")
+        keepOnTopItem.keyEquivalentModifierMask = [.command, .shift]
+        viewMenu.addItem(keepOnTopItem)
+        viewMenu.addItem(.separator())
         viewMenu.addItem(withTitle: "Actual Size", action: #selector(actualSize), keyEquivalent: "0")
         viewMenu.addItem(withTitle: "Zoom In", action: #selector(zoomIn), keyEquivalent: "+")
         viewMenu.addItem(withTitle: "Zoom Out", action: #selector(zoomOut), keyEquivalent: "-")
@@ -146,6 +152,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         NSApp.mainMenu = mainMenu
         NSApp.windowsMenu = windowMenu
+    }
+
+    // MARK: - Find
+
+    @objc private func showFind() {
+        evaluateJS("window.markaOpenFind()")
+    }
+
+    // MARK: - Keep on Top
+
+    @objc private func toggleKeepOnTop() {
+        guard let window = NSApp.keyWindow else { return }
+        if window.level == .floating {
+            window.level = .normal
+        } else {
+            window.level = .floating
+        }
+    }
+
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem.action == #selector(toggleKeepOnTop) {
+            menuItem.state = NSApp.keyWindow?.level == .floating ? .on : .off
+            return NSApp.keyWindow != nil
+        }
+        return true
     }
 
     // MARK: - Zoom (targets key window)
