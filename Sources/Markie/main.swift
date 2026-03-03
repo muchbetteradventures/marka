@@ -20,6 +20,11 @@ if filteredArgs.count > 1 {
         exit(0)
     }
 
+    if rawPath == "--version" || rawPath == "-v" {
+        print("markie \(markieVersion)")
+        exit(0)
+    }
+
     let path: String
     if rawPath.hasPrefix("/") {
         path = rawPath
