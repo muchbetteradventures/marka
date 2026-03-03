@@ -57,7 +57,9 @@ if filteredArgs.count > 1 {
 
 if !isChildProcess {
     // Re-launch ourselves as a detached child process
-    let execPath = CommandLine.arguments[0]
+    let execPath = ProcessInfo.processInfo.arguments[0].hasPrefix("/")
+        ? ProcessInfo.processInfo.arguments[0]
+        : URL(fileURLWithPath: ProcessInfo.processInfo.arguments[0], relativeTo: URL(fileURLWithPath: FileManager.default.currentDirectoryPath)).standardized.path
 
     // Build args: original args + sentinel + for stdin mode, pass content via temp file
     var childArgs = filteredArgs
