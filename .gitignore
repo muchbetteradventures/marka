@@ -8,3 +8,4 @@ DerivedData/
 *.zip
 *.tar.gz
 .env
+.claude/

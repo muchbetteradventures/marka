@@ -19,7 +19,7 @@ if [[ -z "${KEYCHAIN_PROFILE:-}" ]]; then
     exit 1
 fi
 
-BINARY_NAME="markie"
+BINARY_NAME="marka"
 
 # --- Auto-version from conventional commits ---
 
@@ -52,14 +52,14 @@ VERSION="${MAJOR}.${MINOR}.${PATCH}"
 echo "==> Version bump: ${CURRENT_VERSION} -> ${VERSION} (${BUMP})"
 
 # Update Version.swift
-sed -i '' "s/markieVersion = \".*\"/markieVersion = \"${VERSION}\"/" Sources/Markie/Version.swift
+sed -i '' "s/markaVersion = \".*\"/markaVersion = \"${VERSION}\"/" Sources/Marka/Version.swift
 
 # Update Info.plist
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${VERSION}" Info.plist
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${VERSION}" Info.plist
 
 # Commit version bump and tag
-git add Sources/Markie/Version.swift Info.plist
+git add Sources/Marka/Version.swift Info.plist
 git commit -m "release: v${VERSION}"
 git tag "v${VERSION}"
 
@@ -88,7 +88,7 @@ echo "==> Creating ${DMG_NAME}..."
 STAGING_DIR=$(mktemp -d)
 cp "${BINARY}" "${STAGING_DIR}/${BINARY_NAME}"
 rm -f "${DMG_NAME}"
-hdiutil create -volname "Markie ${VERSION}" \
+hdiutil create -volname "Marka ${VERSION}" \
     -srcfolder "${STAGING_DIR}" \
     -ov -format UDZO \
     "${DMG_NAME}"

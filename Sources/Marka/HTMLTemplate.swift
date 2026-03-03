@@ -1308,8 +1308,7 @@ body {
 }
 
 .markdown-body {
-    max-width: 980px;
-    margin: 0 auto;
+    max-width: 100%;
 }
 
 /* highlight.js GitHub theme */

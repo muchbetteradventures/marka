@@ -4,7 +4,7 @@
 
 ```bash
 swift build -c release
-cp .build/release/markie ~/.local/bin/markie
+cp .build/release/marka ~/.local/bin/marka
 ```
 
 Requires `~/.local/bin` on your `PATH` (add `export PATH="$HOME/.local/bin:$PATH"` to `.zshrc`).
@@ -42,7 +42,7 @@ Requires `~/.local/bin` on your `PATH` (add `export PATH="$HOME/.local/bin:$PATH
 
 - **"no identity found"**: Your Developer ID certificate isn't in your Keychain. Open Keychain Access and check under "My Certificates".
 - **Notarization rejected**: Check the log with `xcrun notarytool log <submission-id> --keychain-profile "your-profile"`. Common causes: missing hardened runtime, unsigned dylibs, or unsigned nested executables.
-- **"not notarized" on another Mac**: The stapling step may have failed. You can also run `spctl -a -v /path/to/markie` to check.
+- **"not notarized" on another Mac**: The stapling step may have failed. You can also run `spctl -a -v /path/to/marka` to check.
 
 ## Releasing a New Version
 
@@ -66,7 +66,7 @@ After the script finishes, it prints the next steps:
 
 ```bash
 git push origin main --tags
-gh release create v0.1.0 markie-0.1.0.dmg markie-0.1.0.tar.gz \
+gh release create v0.1.0 marka-0.1.0.dmg marka-0.1.0.tar.gz \
   --title "v0.1.0" --generate-notes
 ```
 
@@ -77,10 +77,10 @@ Then update the Homebrew formula (see below).
 ### Architecture
 
 Two repos are involved:
-- **muchbetteradventures/markie**: the source code. GitHub Releases host the build artifacts.
-- **muchbetteradventures/homebrew-tap**: contains `Formula/markie.rb`, which tells Homebrew where to download the binary and how to install it.
+- **muchbetteradventures/marka**: the source code. GitHub Releases host the build artifacts.
+- **muchbetteradventures/homebrew-tap**: contains `Formula/marka.rb`, which tells Homebrew where to download the binary and how to install it.
 
-We use a **Formula** (not a Cask) because markie is a CLI binary, not a .app bundle. The formula downloads a pre-built, signed tar.gz from GitHub Releases rather than building from source.
+We use a **Formula** (not a Cask) because marka is a CLI binary, not a .app bundle. The formula downloads a pre-built, signed tar.gz from GitHub Releases rather than building from source.
 
 ### Updating the formula after a release
 
@@ -88,10 +88,10 @@ After uploading artifacts to a GitHub Release:
 
 ```bash
 # Get the SHA256 of the tarball
-shasum -a 256 markie-X.Y.Z.tar.gz
+shasum -a 256 marka-X.Y.Z.tar.gz
 ```
 
-Then update `Formula/markie.rb` in the `homebrew-tap` repo:
+Then update `Formula/marka.rb` in the `homebrew-tap` repo:
 - Set `version` to the new version
 - Set `sha256` to the hash from above
 - Commit and push
@@ -100,13 +100,13 @@ Then update `Formula/markie.rb` in the `homebrew-tap` repo:
 
 ```bash
 brew tap muchbetteradventures/tap
-brew install markie
+brew install marka
 ```
 
 Updates:
 ```bash
 brew update
-brew upgrade markie
+brew upgrade marka
 ```
 
 ### Getting into Homebrew Core
@@ -121,4 +121,4 @@ The main `homebrew/core` repo has stricter criteria: the tool needs to be notabl
 | `.env` | Signing identity and keychain profile (gitignored) |
 | `.env.example` | Template for `.env` |
 | `Info.plist` | macOS app metadata, embedded in binary via linker |
-| `Sources/Markie/Version.swift` | Version string, updated by build script |
+| `Sources/Marka/Version.swift` | Version string, updated by build script |

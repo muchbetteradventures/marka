@@ -1,4 +1,4 @@
-# Markie
+# Marka
 
 A lightweight Markdown viewer for macOS, launched from the terminal.
 
@@ -16,11 +16,11 @@ A lightweight Markdown viewer for macOS, launched from the terminal.
 
 ```bash
 # View a file (with live reload)
-markie README.md
+marka README.md
 
 # Pipe from stdin
-cat notes.md | markie
-echo "# Hello" | markie
+cat notes.md | marka
+echo "# Hello" | marka
 ```
 
 ## Example Content
@@ -63,7 +63,7 @@ Requires macOS 15+ (Sequoia) and Swift 6.0.
 
 ```bash
 swift build -c release
-# Binary at .build/release/markie
+# Binary at .build/release/marka
 ```
 
 ## Architecture

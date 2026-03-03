@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleIdentifier</key>
-	<string>com.markie.viewer</string>
+	<string>com.marka.viewer</string>
 	<key>CFBundleName</key>
-	<string>Markie</string>
+	<string>Marka</string>
 	<key>CFBundleShortVersionString</key>
 	<string>0.0.2</string>
 	<key>CFBundleVersion</key>

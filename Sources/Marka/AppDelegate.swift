@@ -3,16 +3,44 @@ import SwiftUI
 import WebKit
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
-    var window: NSWindow?
-    let document: MarkdownDocument
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
+    private var windowInfos: [(window: NSWindow, document: MarkdownDocument, watcher: FileWatcher?, tempPath: String?)] = []
+    private let ipcServer = IPCServer()
+    private let initialDocument: IPCPayload
 
-    init(document: MarkdownDocument) {
-        self.document = document
+    init(initialDocument: IPCPayload) {
+        self.initialDocument = initialDocument
         super.init()
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        setupMenuBar()
+
+        // Start IPC server for subsequent invocations
+        ipcServer.onOpenDocument = { [weak self] payload in
+            self?.openDocument(payload: payload)
+            NSApp.activate(ignoringOtherApps: true)
+        }
+        ipcServer.start()
+
+        // Open the initial document
+        openDocument(payload: initialDocument)
+
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func openDocument(payload: IPCPayload) {
+        let document = MarkdownDocument()
+        let url = URL(fileURLWithPath: payload.path)
+
+        if let content = try? String(contentsOf: url, encoding: .utf8) {
+            document.markdown = content
+        }
+        document.title = payload.title
+        if let base = payload.baseURL {
+            document.baseURL = URL(string: base)
+        }
+
         let contentView = ContentView(document: document)
         let hostingView = NSHostingView(rootView: contentView)
 
@@ -22,20 +50,62 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             backing: .buffered,
             defer: false
         )
+        window.isReleasedWhenClosed = false
         window.title = document.title
         window.contentView = hostingView
+        window.delegate = self
         window.center()
+
+        // Cascade from the last opened window
+        if let lastWindow = windowInfos.last?.window {
+            let origin = lastWindow.cascadeTopLeft(from: .zero)
+            window.cascadeTopLeft(from: origin)
+        }
+
         window.makeKeyAndOrderFront(nil)
-        self.window = window
 
-        setupMenuBar()
+        // Start file watcher for non-temp files
+        var watcher: FileWatcher?
+        if !payload.isTemp {
+            let fw = FileWatcher(path: payload.path) { newContent in
+                document.markdown = newContent
+            }
+            fw.start()
+            watcher = fw
+        }
 
-        NSApp.activate(ignoringOtherApps: true)
+        windowInfos.append((
+            window: window,
+            document: document,
+            watcher: watcher,
+            tempPath: payload.isTemp ? payload.path : nil
+        ))
+    }
+
+    // MARK: - NSWindowDelegate
+
+    func windowWillClose(_ notification: Notification) {
+        guard let closingWindow = notification.object as? NSWindow,
+              let index = windowInfos.firstIndex(where: { $0.window === closingWindow }) else {
+            return
+        }
+
+        let info = windowInfos[index]
+        info.watcher?.stop()
+
+        // Clean up temp file for this window
+        if let tempPath = info.tempPath {
+            try? FileManager.default.removeItem(atPath: tempPath)
+        }
+
+        windowInfos.remove(at: index)
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         true
     }
+
+    // MARK: - Menu bar
 
     private func setupMenuBar() {
         let mainMenu = NSMenu()
@@ -43,9 +113,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // App menu
         let appMenuItem = NSMenuItem()
         let appMenu = NSMenu()
-        appMenu.addItem(withTitle: "About Markie", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+        appMenu.addItem(withTitle: "About Marka", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "Quit Markie", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appMenu.addItem(withTitle: "Quit Marka", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appMenuItem.submenu = appMenu
         mainMenu.addItem(appMenuItem)
 
@@ -78,6 +148,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.windowsMenu = windowMenu
     }
 
+    // MARK: - Zoom (targets key window)
+
     @objc private func actualSize() {
         evaluateJS("document.body.style.zoom = '1'")
     }
@@ -97,7 +169,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func evaluateJS(_ js: String) {
-        guard let hostingView = window?.contentView as? NSHostingView<ContentView>,
+        guard let keyWindow = NSApp.keyWindow,
+              let hostingView = keyWindow.contentView,
               let webView = findWebView(in: hostingView) else { return }
         webView.evaluateJavaScript(js)
     }

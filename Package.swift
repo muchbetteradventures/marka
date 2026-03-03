@@ -3,14 +3,14 @@
 import PackageDescription
 
 let package = Package(
-    name: "markie",
+    name: "marka",
     platforms: [
         .macOS(.v14)
     ],
     targets: [
         .executableTarget(
-            name: "markie",
-            path: "Sources/Markie",
+            name: "marka",
+            path: "Sources/Marka",
             linkerSettings: [
                 .unsafeFlags(["-Xlinker", "-sectcreate",
                               "-Xlinker", "__TEXT",

@@ -1,15 +1,25 @@
 import AppKit
 import Foundation
 
-let isChildProcess = CommandLine.arguments.contains("--markie-child")
+let isChildProcess = CommandLine.arguments.contains("--marka-child")
 nonisolated(unsafe) var _tempFileForCleanup: UnsafeMutablePointer<CChar>?
 
 // --- Input handling ---
 
-let document = MarkdownDocument()
-var fileWatcher: FileWatcher?
+var filteredArgs = CommandLine.arguments.filter { $0 != "--marka-child" }
+if let tempIdx = filteredArgs.firstIndex(of: "--marka-temp") {
+    // Remove --marka-temp and the value after it
+    if tempIdx + 1 < filteredArgs.count {
+        filteredArgs.remove(at: tempIdx + 1)
+    }
+    filteredArgs.remove(at: tempIdx)
+}
 
-var filteredArgs = CommandLine.arguments.filter { $0 != "--markie-child" }
+var filePath: String?
+var isTemp = false
+var title = "Marka (stdin)"
+var baseURL: URL?
+var stdinContent: String?
 
 if filteredArgs.count > 1 {
     // File mode
@@ -21,7 +31,7 @@ if filteredArgs.count > 1 {
     }
 
     if rawPath == "--version" || rawPath == "-v" {
-        print("markie \(markieVersion)")
+        print("marka \(markaVersion)")
         exit(0)
     }
 
@@ -39,51 +49,77 @@ if filteredArgs.count > 1 {
         exit(1)
     }
 
-    guard let content = try? String(contentsOf: url, encoding: .utf8) else {
+    guard (try? String(contentsOf: url, encoding: .utf8)) != nil else {
         fputs("Error: Could not read file: \(url.path)\n", stderr)
         exit(1)
     }
 
-    document.markdown = content
-    document.title = url.lastPathComponent
-    document.baseURL = url.deletingLastPathComponent()
+    filePath = url.path
+    title = url.lastPathComponent
+    baseURL = url.deletingLastPathComponent()
 
-} else if let stdinContent = StdinReader.readAll() {
-    // Stdin mode
-    document.markdown = stdinContent
-    document.title = "Markie (stdin)"
+} else if let content = StdinReader.readAll() {
+    // Stdin mode: write temp file now so it's available for IPC or child
+    stdinContent = content
+    let tempFile = NSTemporaryDirectory() + "marka-stdin-\(ProcessInfo.processInfo.processIdentifier).md"
+    try? content.write(toFile: tempFile, atomically: true, encoding: .utf8)
+    filePath = tempFile
+    isTemp = true
+    title = "Marka (stdin)"
 
 } else {
     printUsage()
     exit(1)
 }
 
+// --- Check for temp file passed from parent process ---
+
+var tempFileToClean: String?
+if let tempIdx = CommandLine.arguments.firstIndex(of: "--marka-temp"),
+   tempIdx + 1 < CommandLine.arguments.count {
+    tempFileToClean = CommandLine.arguments[tempIdx + 1]
+    isTemp = true
+}
+
+// --- IPC: try handing off to running instance ---
+
+if !isChildProcess, let path = filePath {
+    let payload = IPCPayload(
+        path: path,
+        isTemp: isTemp,
+        title: title,
+        baseURL: baseURL?.absoluteString
+    )
+
+    if sendToRunningInstance(payload: payload) {
+        _exit(0)
+    }
+}
+
 // --- Detach from terminal ---
 
 if !isChildProcess {
-    // Re-launch ourselves as a detached child process
     let execPath = ProcessInfo.processInfo.arguments[0].hasPrefix("/")
         ? ProcessInfo.processInfo.arguments[0]
         : URL(fileURLWithPath: ProcessInfo.processInfo.arguments[0], relativeTo: URL(fileURLWithPath: FileManager.default.currentDirectoryPath)).standardized.path
 
-    // Build args: original args + sentinel + for stdin mode, pass content via temp file
-    var childArgs = filteredArgs
-    childArgs.append("--markie-child")
-
-    // If stdin mode, write content to a temp file and pass that instead
-    if filteredArgs.count <= 1 {
-        let tempFile = NSTemporaryDirectory() + "markie-stdin-\(ProcessInfo.processInfo.processIdentifier).md"
-        try? document.markdown.write(toFile: tempFile, atomically: true, encoding: .utf8)
-        childArgs = [filteredArgs[0], tempFile, "--markie-child", "--markie-temp", tempFile]
+    // Build args: executable path + file path + sentinel
+    var childArgs = [execPath]
+    if let path = filePath {
+        childArgs.append(path)
+    }
+    childArgs.append("--marka-child")
+    if isTemp, let path = filePath {
+        childArgs.append("--marka-temp")
+        childArgs.append(path)
     }
 
     var pid: pid_t = 0
-    let argv = ([execPath] + childArgs.dropFirst()).map { strdup($0) } + [nil]
+    let argv = childArgs.map { strdup($0) } + [nil]
     defer { argv.forEach { free($0) } }
 
     var fileActions: posix_spawn_file_actions_t?
     posix_spawn_file_actions_init(&fileActions)
-    // Detach stdin/stdout/stderr so terminal isn't held
     posix_spawn_file_actions_addopen(&fileActions, STDIN_FILENO, "/dev/null", O_RDONLY, 0)
     posix_spawn_file_actions_addopen(&fileActions, STDOUT_FILENO, "/dev/null", O_WRONLY, 0)
     posix_spawn_file_actions_addopen(&fileActions, STDERR_FILENO, "/dev/null", O_WRONLY, 0)
@@ -104,41 +140,24 @@ if !isChildProcess {
     _exit(0)
 }
 
-// --- Child process: clean up temp file on exit if needed ---
-
-var tempFileToClean: String?
-if let tempIdx = CommandLine.arguments.firstIndex(of: "--markie-temp"),
-   tempIdx + 1 < CommandLine.arguments.count {
-    tempFileToClean = CommandLine.arguments[tempIdx + 1]
-}
-
-// Start file watcher (only for real files, not temp stdin files)
-if filteredArgs.count > 1, tempFileToClean == nil {
-    let rawPath = filteredArgs[1]
-    let path: String
-    if rawPath.hasPrefix("/") {
-        path = rawPath
-    } else {
-        path = FileManager.default.currentDirectoryPath + "/" + rawPath
-    }
-    let url = URL(fileURLWithPath: path).standardized
-
-    fileWatcher = FileWatcher(path: url.path) { newContent in
-        document.markdown = newContent
-    }
-    fileWatcher?.start()
-}
-
-// --- App bootstrap ---
+// --- Child process: app bootstrap ---
 
 let app = NSApplication.shared
 app.setActivationPolicy(.regular)
 
-let delegate = AppDelegate(document: document)
+let initialPayload = IPCPayload(
+    path: filePath ?? "",
+    isTemp: isTemp || tempFileToClean != nil,
+    title: title,
+    baseURL: baseURL?.absoluteString
+)
+
+let delegate = AppDelegate(initialDocument: initialPayload)
 app.delegate = delegate
 
 // Clean temp file when app terminates
-if let tempFile = tempFileToClean {
+let tempFile = tempFileToClean ?? (isTemp ? filePath : nil)
+if let tempFile {
     _tempFileForCleanup = strdup(tempFile)
     atexit {
         if let p = _tempFileForCleanup {
@@ -154,16 +173,16 @@ app.run()
 
 func printUsage() {
     let usage = """
-    Usage: markie <file.md>
-           command | markie
+    Usage: marka <file.md>
+           command | marka
 
     A lightweight Markdown viewer for the terminal.
 
     Examples:
-      markie README.md
-      markie ~/notes/todo.md
-      cat notes.md | markie
-      echo "# Hello" | markie
+      marka README.md
+      marka ~/notes/todo.md
+      cat notes.md | marka
+      echo "# Hello" | marka
     """
     print(usage)
 }
