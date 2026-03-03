@@ -7,6 +7,7 @@ struct ContentView: View {
     var body: some View {
         ScrollView {
             MarkdownView(document.markdown)
+                .textSelection(.enabled)
                 .padding(32)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
