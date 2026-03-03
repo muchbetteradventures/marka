@@ -29,6 +29,9 @@ hdiutil create -volname "Markie" \
     "${BINARY_NAME}.dmg"
 rm -rf "${STAGING_DIR}"
 
+echo "==> Signing .dmg..."
+codesign --sign "${SIGNING_IDENTITY}" "${BINARY_NAME}.dmg"
+
 echo "==> Submitting .dmg for notarization (this may take a minute)..."
 xcrun notarytool submit "${BINARY_NAME}.dmg" \
     --keychain-profile "${KEYCHAIN_PROFILE}" \
