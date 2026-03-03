@@ -5,17 +5,11 @@ import PackageDescription
 let package = Package(
     name: "markie",
     platforms: [
-        .macOS(.v15)
-    ],
-    dependencies: [
-        .package(url: "https://github.com/LiYanan2004/MarkdownView", branch: "main")
+        .macOS(.v14)
     ],
     targets: [
         .executableTarget(
             name: "markie",
-            dependencies: [
-                .product(name: "MarkdownView", package: "MarkdownView")
-            ],
             path: "Sources/Markie",
             linkerSettings: [
                 .unsafeFlags(["-Xlinker", "-sectcreate",
