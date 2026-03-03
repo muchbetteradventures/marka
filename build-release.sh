@@ -19,19 +19,7 @@ codesign --sign "${SIGNING_IDENTITY}" \
 echo "==> Verifying signature..."
 codesign --verify --verbose "${BINARY}"
 
-echo "==> Zipping for notarization..."
-rm -f "${BINARY_NAME}.zip"
-zip -j "${BINARY_NAME}.zip" "${BINARY}"
-
-echo "==> Submitting for notarization (this may take a minute)..."
-xcrun notarytool submit "${BINARY_NAME}.zip" \
-    --keychain-profile "${KEYCHAIN_PROFILE}" \
-    --wait
-
-echo "==> Cleaning up zip..."
-rm -f "${BINARY_NAME}.zip"
-
-echo "==> Creating .dmg for distribution..."
+echo "==> Creating .dmg..."
 STAGING_DIR=$(mktemp -d)
 cp "${BINARY}" "${STAGING_DIR}/${BINARY_NAME}"
 rm -f "${BINARY_NAME}.dmg"
@@ -40,6 +28,14 @@ hdiutil create -volname "Markie" \
     -ov -format UDZO \
     "${BINARY_NAME}.dmg"
 rm -rf "${STAGING_DIR}"
+
+echo "==> Submitting .dmg for notarization (this may take a minute)..."
+xcrun notarytool submit "${BINARY_NAME}.dmg" \
+    --keychain-profile "${KEYCHAIN_PROFILE}" \
+    --wait
+
+echo "==> Waiting for ticket propagation..."
+sleep 15
 
 echo "==> Stapling notarization ticket to .dmg..."
 xcrun stapler staple "${BINARY_NAME}.dmg"
