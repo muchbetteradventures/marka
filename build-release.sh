@@ -28,12 +28,24 @@ xcrun notarytool submit "${BINARY_NAME}.zip" \
     --keychain-profile "${KEYCHAIN_PROFILE}" \
     --wait
 
-echo "==> Stapling notarization ticket..."
-xcrun stapler staple "${BINARY}"
-
 echo "==> Cleaning up zip..."
 rm -f "${BINARY_NAME}.zip"
 
+echo "==> Creating .dmg for distribution..."
+STAGING_DIR=$(mktemp -d)
+cp "${BINARY}" "${STAGING_DIR}/${BINARY_NAME}"
+rm -f "${BINARY_NAME}.dmg"
+hdiutil create -volname "Markie" \
+    -srcfolder "${STAGING_DIR}" \
+    -ov -format UDZO \
+    "${BINARY_NAME}.dmg"
+rm -rf "${STAGING_DIR}"
+
+echo "==> Stapling notarization ticket to .dmg..."
+xcrun stapler staple "${BINARY_NAME}.dmg"
+
 echo ""
-echo "Done. Signed and notarized binary at: ${BINARY}"
-echo "Install with: cp ${BINARY} ~/.local/bin/${BINARY_NAME}"
+echo "Done."
+echo "  Signed binary at: ${BINARY}"
+echo "  Distributable:    ${BINARY_NAME}.dmg"
+echo "  Install locally:  cp ${BINARY} ~/.local/bin/${BINARY_NAME}"
