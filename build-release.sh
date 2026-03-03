@@ -1,8 +1,24 @@
 #!/bin/bash
 set -euo pipefail
 
-SIGNING_IDENTITY="${SIGNING_IDENTITY}"
-KEYCHAIN_PROFILE="${KEYCHAIN_PROFILE}"
+# Load signing config from .env
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/.env" ]]; then
+    source "${SCRIPT_DIR}/.env"
+else
+    echo "Error: .env file not found. Copy .env.example to .env and fill in your values."
+    exit 1
+fi
+
+if [[ -z "${SIGNING_IDENTITY:-}" ]]; then
+    echo "Error: SIGNING_IDENTITY not set in .env"
+    exit 1
+fi
+if [[ -z "${KEYCHAIN_PROFILE:-}" ]]; then
+    echo "Error: KEYCHAIN_PROFILE not set in .env"
+    exit 1
+fi
+
 BINARY_NAME="markie"
 
 # --- Auto-version from conventional commits ---
@@ -66,6 +82,7 @@ echo "==> Verifying signature..."
 codesign --verify --verbose "${BINARY}"
 
 DMG_NAME="${BINARY_NAME}-${VERSION}.dmg"
+TAR_NAME="${BINARY_NAME}-${VERSION}.tar.gz"
 
 echo "==> Creating ${DMG_NAME}..."
 STAGING_DIR=$(mktemp -d)
@@ -79,6 +96,9 @@ rm -rf "${STAGING_DIR}"
 
 echo "==> Signing .dmg..."
 codesign --sign "${SIGNING_IDENTITY}" "${DMG_NAME}"
+
+echo "==> Creating ${TAR_NAME} for Homebrew..."
+tar -czf "${TAR_NAME}" -C .build/release "${BINARY_NAME}"
 
 echo "==> Submitting .dmg for notarization (this may take a minute)..."
 xcrun notarytool submit "${DMG_NAME}" \
@@ -94,5 +114,10 @@ xcrun stapler staple "${DMG_NAME}"
 echo ""
 echo "Done. v${VERSION}"
 echo "  Signed binary at: ${BINARY}"
-echo "  Distributable:    ${DMG_NAME}"
+echo "  DMG:              ${DMG_NAME}"
+echo "  Homebrew tarball:  ${TAR_NAME}"
 echo "  Install locally:  cp ${BINARY} ~/.local/bin/${BINARY_NAME}"
+echo ""
+echo "Next steps:"
+echo "  git push origin main --tags"
+echo "  gh release create v${VERSION} ${DMG_NAME} ${TAR_NAME} --title \"v${VERSION}\" --generate-notes"
