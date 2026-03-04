@@ -39,10 +39,7 @@ struct MarkdownWebView: NSViewRepresentable {
     }
 
     private func pushMarkdownUpdate(webView: WKWebView, markdown: String) {
-        let escaped = markdown
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "`", with: "\\`")
-            .replacingOccurrences(of: "$", with: "\\$")
+        let escaped = markdown.jsTemplateEscaped
         webView.evaluateJavaScript("updateMarkdown(`\(escaped)`)")
     }
 
