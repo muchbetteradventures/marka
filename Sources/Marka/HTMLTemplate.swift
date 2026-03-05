@@ -17,6 +17,7 @@ enum HTMLTemplate {
         \(appScriptBlock)
         <script>
         updateMarkdown(`\(escapedMarkdown)`);
+        window.markaSetNarrowLayout(\(UserDefaults.standard.bool(forKey: "narrowLayout") ? "true" : "false"));
         </script>
         </body>
         </html>

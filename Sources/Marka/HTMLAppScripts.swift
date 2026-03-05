@@ -162,6 +162,32 @@ function updateMarkdown(md) {
     window.markaIsFindOpen = isFindOpen;
 })();
 
+// --- Copy as Rich Text ---
+
+window.markaGetContentHTML = function() {
+    var sel = window.getSelection();
+    if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
+        var container = document.createElement('div');
+        container.appendChild(sel.getRangeAt(0).cloneContents());
+        return container.innerHTML;
+    }
+    return document.getElementById('content').innerHTML;
+};
+
+// --- Narrow Layout ---
+
+window.markaSetNarrowLayout = function(narrow) {
+    var el = document.querySelector('.markdown-body');
+    if (!el) return;
+    if (narrow) {
+        el.style.maxWidth = '980px';
+        el.style.margin = '0 auto';
+    } else {
+        el.style.maxWidth = '';
+        el.style.margin = '';
+    }
+};
+
 // --- Keyboard navigation ---
 
 (function() {

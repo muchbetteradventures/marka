@@ -15,9 +15,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        menuBarBuilder = MenuBarBuilder(evaluateJS: { [weak self] js in
-            self?.evaluateJS(js)
-        })
+        menuBarBuilder = MenuBarBuilder(
+            evaluateJS: { [weak self] js in
+                self?.evaluateJS(js)
+            },
+            evaluateJSWithResult: { [weak self] js, handler in
+                self?.evaluateJSWithResult(js, handler: handler)
+            },
+            openDocument: { [weak self] payload in
+                self?.openDocument(payload: payload)
+            },
+            evaluateJSAllWindows: { [weak self] js in
+                self?.evaluateJSAllWindows(js)
+            }
+        )
         let menus = menuBarBuilder.buildMenuBar()
         NSApp.mainMenu = menus.mainMenu
         NSApp.windowsMenu = menus.windowMenu
@@ -125,6 +136,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                   let webView = findWebView(in: hostingView) {
             windowInfos[index].webView = webView
             webView.evaluateJavaScript(js)
+        }
+    }
+
+    private func evaluateJSWithResult(_ js: String, handler: @escaping (String?) -> Void) {
+        guard let keyWindow = NSApp.keyWindow,
+              let index = windowInfos.firstIndex(where: { $0.window === keyWindow }) else {
+            handler(nil)
+            return
+        }
+
+        let webView: WKWebView?
+        if let cached = windowInfos[index].webView {
+            webView = cached
+        } else if let hostingView = keyWindow.contentView,
+                  let found = findWebView(in: hostingView) {
+            windowInfos[index].webView = found
+            webView = found
+        } else {
+            webView = nil
+        }
+
+        guard let wv = webView else {
+            handler(nil)
+            return
+        }
+
+        wv.evaluateJavaScript(js) { result, _ in
+            handler(result as? String)
+        }
+    }
+
+    private func evaluateJSAllWindows(_ js: String) {
+        for i in windowInfos.indices {
+            if let webView = windowInfos[i].webView {
+                webView.evaluateJavaScript(js)
+            } else if let hostingView = windowInfos[i].window.contentView,
+                      let webView = findWebView(in: hostingView) {
+                windowInfos[i].webView = webView
+                webView.evaluateJavaScript(js)
+            }
         }
     }
 
