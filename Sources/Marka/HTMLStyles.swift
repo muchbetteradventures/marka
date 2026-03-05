@@ -1429,15 +1429,17 @@ mark.marka-highlight.active {
 }
 
 /* highlight.js GitHub theme */
+/* Override hljs base styles: the <pre> handles padding/overflow/radius,
+   so the inner <code> must remain transparent and non-clipping. */
 pre code.hljs {
-    padding: 16px;
-    overflow: auto;
-    border-radius: 6px;
+    padding: 0;
+    overflow: visible;
+    border-radius: 0;
+    background: transparent;
 }
 
 @media (prefers-color-scheme: light) {
     pre code.hljs {
-        background: #f6f8fa;
         color: #24292e;
     }
     .hljs-comment, .hljs-quote { color: #6a737d; }
@@ -1452,7 +1454,6 @@ pre code.hljs {
 
 @media (prefers-color-scheme: dark) {
     pre code.hljs {
-        background: #161b22;
         color: #e6edf3;
     }
     .hljs-comment, .hljs-quote { color: #8b949e; }
