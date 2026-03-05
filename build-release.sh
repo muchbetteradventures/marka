@@ -112,12 +112,39 @@ echo "==> Stapling notarization ticket to .dmg..."
 xcrun stapler staple "${DMG_NAME}"
 
 echo ""
-echo "Done. v${VERSION}"
+echo "==> Build complete. v${VERSION}"
 echo "  Signed binary at: ${BINARY}"
 echo "  DMG:              ${DMG_NAME}"
 echo "  Homebrew tarball:  ${TAR_NAME}"
 echo "  Install locally:  cp ${BINARY} ~/.local/bin/${BINARY_NAME}"
+
+# --- Publish ---
+
 echo ""
-echo "Next steps:"
-echo "  git push origin main --tags"
-echo "  gh release create v${VERSION} ${DMG_NAME} ${TAR_NAME} --title \"v${VERSION}\" --generate-notes"
+echo "==> Pushing to GitHub..."
+git push origin main --tags
+
+echo "==> Creating GitHub release..."
+gh release create "v${VERSION}" "${DMG_NAME}" "${TAR_NAME}" \
+    --title "v${VERSION}" --generate-notes
+
+# --- Update Homebrew tap ---
+
+TAP_REPO="${SCRIPT_DIR}/../homebrew-tap"
+FORMULA="${TAP_REPO}/Formula/marka.rb"
+
+if [[ -f "${FORMULA}" ]]; then
+    echo "==> Updating Homebrew formula..."
+    SHA=$(shasum -a 256 "${TAR_NAME}" | awk '{print $1}')
+    sed -i '' "s/version \".*\"/version \"${VERSION}\"/" "${FORMULA}"
+    sed -i '' "s/sha256 \".*\"/sha256 \"${SHA}\"/" "${FORMULA}"
+    git -C "${TAP_REPO}" add Formula/marka.rb
+    git -C "${TAP_REPO}" commit -m "marka ${VERSION}"
+    git -C "${TAP_REPO}" push origin main
+    echo "==> Homebrew tap updated"
+else
+    echo "Warning: tap formula not found at ${FORMULA}, skipping"
+fi
+
+echo ""
+echo "==> Released v${VERSION}"
