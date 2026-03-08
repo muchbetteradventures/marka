@@ -7,6 +7,10 @@ struct ParsedArguments {
     let baseURL: URL?
     let isChildProcess: Bool
     let tempFileToClean: String?
+    // TextBundle support
+    let isTextBundle: Bool
+    let bundlePath: String?           // Original bundle path (for display)
+    let extractedPath: String?        // For textpack: temp extraction directory to clean up
 }
 
 enum LaunchAction {
@@ -61,6 +65,27 @@ enum ArgumentParser {
                 exit(1)
             }
 
+            // Check if this is a TextBundle or TextPack
+            if TextBundleHandler.isTextBundle(path: url.path) {
+                do {
+                    let bundle = try TextBundleHandler.load(path: url.path)
+                    return .run(ParsedArguments(
+                        filePath: bundle.markdownFilePath,
+                        isTemp: bundle.isTextPack,  // TextPacks are extracted to temp
+                        title: bundle.title,
+                        baseURL: bundle.assetsPath ?? URL(fileURLWithPath: bundle.markdownFilePath).deletingLastPathComponent(),
+                        isChildProcess: isChildProcess,
+                        tempFileToClean: tempFileToClean,
+                        isTextBundle: true,
+                        bundlePath: bundle.bundlePath,
+                        extractedPath: bundle.extractedPath
+                    ))
+                } catch {
+                    fputs("Error: \(error.localizedDescription)\n", stderr)
+                    exit(1)
+                }
+            }
+
             guard (try? String(contentsOf: url, encoding: .utf8)) != nil else {
                 fputs("Error: Could not read file: \(url.path)\n", stderr)
                 exit(1)
@@ -72,7 +97,10 @@ enum ArgumentParser {
                 title: url.lastPathComponent,
                 baseURL: url.deletingLastPathComponent(),
                 isChildProcess: isChildProcess,
-                tempFileToClean: tempFileToClean
+                tempFileToClean: tempFileToClean,
+                isTextBundle: false,
+                bundlePath: nil,
+                extractedPath: nil
             ))
 
         } else if let content = StdinReader.readAll() {
@@ -85,7 +113,10 @@ enum ArgumentParser {
                 title: "Marka (stdin)",
                 baseURL: nil,
                 isChildProcess: isChildProcess,
-                tempFileToClean: tempFileToClean
+                tempFileToClean: tempFileToClean,
+                isTextBundle: false,
+                bundlePath: nil,
+                extractedPath: nil
             ))
 
         } else {
@@ -96,13 +127,22 @@ enum ArgumentParser {
     static func printUsage() {
         let usage = """
         Usage: marka <file.md>
+               marka <file.textbundle>
+               marka <file.textpack>
                command | marka
 
         A lightweight Markdown viewer for the terminal.
 
+        Supported formats:
+          .md           Markdown files
+          .textbundle   TextBundle packages (with images)
+          .textpack     Compressed TextBundle archives
+
         Examples:
           marka README.md
           marka ~/notes/todo.md
+          marka recipe.textbundle
+          marka document.textpack
           cat notes.md | marka
           echo "# Hello" | marka
         """

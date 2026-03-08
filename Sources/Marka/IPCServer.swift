@@ -8,6 +8,10 @@ struct IPCPayload: Codable {
     let isTemp: Bool
     let title: String
     let baseURL: String?
+    // TextBundle support
+    let isTextBundle: Bool
+    let bundlePath: String?
+    let extractedPath: String?
 }
 
 /// Attempts to send a document payload to an already-running marka instance.

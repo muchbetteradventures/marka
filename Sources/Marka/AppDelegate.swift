@@ -4,7 +4,7 @@ import WebKit
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
-    private var windowInfos: [(window: NSWindow, document: MarkdownDocument, watcher: FileWatcher?, webView: WKWebView?, tempPath: String?)] = []
+    private var windowInfos: [(window: NSWindow, document: MarkdownDocument, watcher: FileWatcher?, webView: WKWebView?, tempPath: String?, extractedPath: String?)] = []
     private let ipcServer = IPCServer()
     private let initialDocument: IPCPayload
     private var menuBarBuilder: MenuBarBuilder!
@@ -96,7 +96,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             document: document,
             watcher: watcher,
             webView: nil,
-            tempPath: payload.isTemp ? payload.path : nil
+            tempPath: payload.isTemp ? payload.path : nil,
+            extractedPath: payload.extractedPath
         ))
     }
 
@@ -114,6 +115,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         // Clean up temp file for this window
         if let tempPath = info.tempPath {
             try? FileManager.default.removeItem(atPath: tempPath)
+        }
+
+        // Clean up extracted textpack directory
+        if let extractedPath = info.extractedPath {
+            try? FileManager.default.removeItem(atPath: extractedPath)
         }
 
         windowInfos.remove(at: index)

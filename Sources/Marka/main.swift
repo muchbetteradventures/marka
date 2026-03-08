@@ -2,6 +2,7 @@ import AppKit
 import Foundation
 
 nonisolated(unsafe) var _tempFileForCleanup: UnsafeMutablePointer<CChar>?
+nonisolated(unsafe) var _extractedPathForCleanup: UnsafeMutablePointer<CChar>?
 
 // --- Parse arguments ---
 
@@ -22,7 +23,10 @@ case .run(let args):
             path: args.filePath,
             isTemp: args.isTemp,
             title: args.title,
-            baseURL: args.baseURL?.absoluteString
+            baseURL: args.baseURL?.absoluteString,
+            isTextBundle: args.isTextBundle,
+            bundlePath: args.bundlePath,
+            extractedPath: args.extractedPath
         )
 
         if sendToRunningInstance(payload: payload) {
@@ -79,7 +83,10 @@ case .run(let args):
         path: args.filePath,
         isTemp: args.isTemp || args.tempFileToClean != nil,
         title: args.title,
-        baseURL: args.baseURL?.absoluteString
+        baseURL: args.baseURL?.absoluteString,
+        isTextBundle: args.isTextBundle,
+        bundlePath: args.bundlePath,
+        extractedPath: args.extractedPath
     )
 
     let delegate = AppDelegate(initialDocument: initialPayload)
@@ -89,11 +96,23 @@ case .run(let args):
     let tempFile = args.tempFileToClean ?? (args.isTemp ? args.filePath : nil)
     if let tempFile {
         _tempFileForCleanup = strdup(tempFile)
-        atexit {
-            if let p = _tempFileForCleanup {
-                unlink(p)
-                free(p)
-            }
+    }
+
+    // Clean extracted textpack directory when app terminates
+    if let extractedPath = args.extractedPath {
+        _extractedPathForCleanup = strdup(extractedPath)
+    }
+
+    atexit {
+        if let p = _tempFileForCleanup {
+            unlink(p)
+            free(p)
+        }
+        if let p = _extractedPathForCleanup {
+            // Remove directory recursively
+            let fm = FileManager.default
+            try? fm.removeItem(atPath: String(cString: p))
+            free(p)
         }
     }
 

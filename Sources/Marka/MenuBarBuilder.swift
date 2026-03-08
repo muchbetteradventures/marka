@@ -133,7 +133,7 @@ final class MenuBarBuilder: NSObject, NSMenuItemValidation {
             NSSound.beep()
             return
         }
-        openDocument(IPCPayload(path: tempPath, isTemp: true, title: "Clipboard", baseURL: nil))
+        openDocument(IPCPayload(path: tempPath, isTemp: true, title: "Clipboard", baseURL: nil, isTextBundle: false, bundlePath: nil, extractedPath: nil))
     }
 
     @objc private func toggleNarrowLayout() {
