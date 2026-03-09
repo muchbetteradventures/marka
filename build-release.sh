@@ -168,19 +168,19 @@ gh release create "v${VERSION}" "${DMG_NAME}" "${TAR_NAME}" \
 # --- Update Homebrew tap ---
 
 TAP_REPO="${SCRIPT_DIR}/../homebrew-tap"
-FORMULA="${TAP_REPO}/Formula/marka.rb"
+CASK="${TAP_REPO}/Casks/marka.rb"
 
-if [[ -f "${FORMULA}" ]]; then
-    echo "==> Updating Homebrew formula..."
-    SHA=$(shasum -a 256 "${TAR_NAME}" | awk '{print $1}')
-    sed -i '' "s/version \".*\"/version \"${VERSION}\"/" "${FORMULA}"
-    sed -i '' "s/sha256 \".*\"/sha256 \"${SHA}\"/" "${FORMULA}"
-    git -C "${TAP_REPO}" add Formula/marka.rb
+if [[ -f "${CASK}" ]]; then
+    echo "==> Updating Homebrew cask..."
+    SHA=$(shasum -a 256 "${DMG_NAME}" | awk '{print $1}')
+    sed -i '' "s/version \".*\"/version \"${VERSION}\"/" "${CASK}"
+    sed -i '' "s/sha256 \".*\"/sha256 \"${SHA}\"/" "${CASK}"
+    git -C "${TAP_REPO}" add Casks/marka.rb
     git -C "${TAP_REPO}" commit -m "marka ${VERSION}"
     git -C "${TAP_REPO}" push origin main
     echo "==> Homebrew tap updated"
 else
-    echo "Warning: tap formula not found at ${FORMULA}, skipping"
+    echo "Warning: cask not found at ${CASK}, skipping"
 fi
 
 echo ""
