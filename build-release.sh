@@ -93,8 +93,15 @@ fi
 # --- Sign ---
 
 echo "==> Signing with hardened runtime (inside-out)..."
-# Sign extension first with its entitlements, then the app.
+# Sign all frameworks first, then extension, then app.
 # --deep would overwrite the extension's entitlements.
+if [ -d "${APP_PATH}/Contents/Frameworks" ]; then
+    echo "  Signing frameworks..."
+    find "${APP_PATH}/Contents/Frameworks" -type f \( -name "*.dylib" -o -name "*.framework" \) -print0 | while IFS= read -r -d '' fw; do
+        codesign --sign "${SIGNING_IDENTITY}" --options runtime --force "$fw"
+    done
+fi
+
 codesign --sign "${SIGNING_IDENTITY}" \
          --options runtime \
          --force \
