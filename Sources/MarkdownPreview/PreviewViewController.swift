@@ -16,7 +16,7 @@ class PreviewViewController: NSViewController, @preconcurrency QLPreviewingContr
         textView.isEditable = false
         textView.isSelectable = true
         textView.autoresizingMask = [.width]
-        textView.textContainerInset = NSSize(width: 20, height: 20)
+        textView.textContainerInset = NSSize(width: 40, height: 20)
         textView.textContainer?.widthTracksTextView = true
 
         scrollView.documentView = textView
@@ -47,6 +47,11 @@ class PreviewViewController: NSViewController, @preconcurrency QLPreviewingContr
             var renderer = QLMarkdownRenderer()
             let attributedString = renderer.attributedString(from: markdown)
             textView.textStorage?.setAttributedString(attributedString)
+            let isDark = view.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            let bgColor = isDark ? NSColor(red: 0.051, green: 0.067, blue: 0.09, alpha: 1.0) : NSColor.white
+            textView.backgroundColor = bgColor
+            scrollView.backgroundColor = bgColor
+            scrollView.drawsBackground = true
             handler(nil)
         } catch {
             handler(error)
