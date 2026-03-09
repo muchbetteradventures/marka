@@ -17,6 +17,8 @@ targets:
     sources:
       - path: Sources/Marka
       - path: Sources/Shared
+      - path: AppIcon.icns
+        buildPhase: resources
     settings:
       PRODUCT_BUNDLE_IDENTIFIER: com.marka.viewer
       PRODUCT_NAME: Marka

@@ -92,11 +92,19 @@ fi
 
 # --- Sign ---
 
-echo "==> Signing with hardened runtime..."
+echo "==> Signing with hardened runtime (inside-out)..."
+# Sign extension first with its entitlements, then the app.
+# --deep would overwrite the extension's entitlements.
 codesign --sign "${SIGNING_IDENTITY}" \
          --options runtime \
          --force \
-         --deep \
+         --entitlements MarkdownPreview.entitlements \
+         "${APP_PATH}/Contents/PlugIns/MarkdownPreview.appex"
+
+codesign --sign "${SIGNING_IDENTITY}" \
+         --options runtime \
+         --force \
+         --entitlements Marka.entitlements \
          "${APP_PATH}"
 
 echo "==> Verifying signature..."
@@ -145,7 +153,12 @@ echo "  Homebrew tarball:  ${TAR_NAME}"
 # --- Publish ---
 
 echo ""
-echo "==> Pushing to GitHub..."
+echo "==> Merging to main and pushing..."
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+if [[ "${CURRENT_BRANCH}" != "main" ]]; then
+    git checkout main
+    git merge "${CURRENT_BRANCH}" --no-edit
+fi
 git push origin main --tags
 
 echo "==> Creating GitHub release..."
