@@ -1,4 +1,10 @@
 name: Marka
+
+packages:
+  swift-cmark:
+    url: https://github.com/swiftlang/swift-cmark.git
+    branch: gfm
+
 options:
   bundleIdPrefix: com.marka
   deploymentTarget:
@@ -49,4 +55,8 @@ targets:
       INFOPLIST_FILE: MarkdownPreview-Info.plist
       GENERATE_INFOPLIST_FILE: NO
       SKIP_INSTALL: YES
-    dependencies: []
+    dependencies:
+      - package: swift-cmark
+        product: cmark-gfm
+      - package: swift-cmark
+        product: cmark-gfm-extensions
