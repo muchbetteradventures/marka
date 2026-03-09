@@ -40,7 +40,9 @@ class PreviewViewController: NSViewController, @preconcurrency QLPreviewingContr
             width: contentWidth,
             height: contentSize.height
         )
+        scrollView.automaticallyAdjustsContentInsets = false
         scrollView.contentInsets = NSEdgeInsets(top: padding, left: padding, bottom: padding, right: padding)
+        scrollView.scrollerInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: -padding)
     }
 
     func preparePreviewOfFile(at url: URL, completionHandler handler: @escaping (Error?) -> Void) {

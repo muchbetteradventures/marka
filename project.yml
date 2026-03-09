@@ -5,9 +5,11 @@ packages:
     url: https://github.com/apple/swift-markdown.git
     branch: main
   MarkdownView:
-    path: ../MarkdownView
+    url: https://github.com/muchbetteradventures/MarkdownView.git
+    branch: marka-patches
   Litext:
-    path: ../Litext
+    url: https://github.com/muchbetteradventures/Litext.git
+    branch: main
 
 options:
   bundleIdPrefix: com.marka

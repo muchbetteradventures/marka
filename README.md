@@ -1,16 +1,24 @@
 # Marka
 
-A lightweight Markdown viewer for macOS, launched from the terminal.
+A lightweight Markdown viewer for macOS, launched from the terminal. Includes a QuickLook extension for previewing Markdown files in Finder.
 
 ## Features
 
 - GitHub-Flavoured Markdown rendering (tables, task lists, strikethrough, code blocks)
-- Syntax highlighting for code blocks (via Textual's built-in Prism highlighter)
-- Native SwiftUI text rendering (no WebView)
-- Native text selection and copy/paste
+- Syntax highlighting for code blocks
 - Live reload on file changes
 - Dark mode support (follows system appearance)
 - Stdin support for piping
+- QuickLook extension for .md, .textbundle, and .textpack files
+- Find in page, zoom, narrow layout, copy as rich text
+- Keep window on top
+
+## Install
+
+```bash
+brew tap muchbetteradventures/tap
+brew install marka
+```
 
 ## Usage
 
@@ -23,43 +31,11 @@ cat notes.md | marka
 echo "# Hello" | marka
 ```
 
-## Example Content
-
-### Table
-
-| Feature | Status |
-|---------|--------|
-| GFM tables | Yes |
-| Task lists | Yes |
-| Code highlighting | Yes |
-| Live reload | Yes |
-| Dark mode | Yes |
-
-### Task List
-
-- [x] Basic rendering
-- [x] Syntax highlighting
-- [x] File watching
-- [x] Stdin support
-- [ ] World domination
-
-### Code Block
-
-```python
-def hello(name: str) -> str:
-    """Greet someone."""
-    return f"Hello, {name}!"
-
-print(hello("world"))
-```
-
-### Strikethrough
-
-This is ~~not~~ a great markdown viewer.
+QuickLook: press Space on any .md file in Finder to preview it.
 
 ## Build
 
-Requires macOS 15+ (Sequoia) and Swift 6.0.
+Requires macOS 14+ and Swift 6.0.
 
 ```bash
 swift build -c release
@@ -68,4 +44,17 @@ swift build -c release
 
 ## Architecture
 
-Uses [Textual](https://github.com/gonzalezreal/textual) for native SwiftUI markdown rendering with the GitHub style preset. No WebView involved, just pure SwiftUI `Text` views.
+The main app uses a WKWebView with GitHub-flavoured CSS and highlight.js for syntax highlighting. The QuickLook extension uses native rendering via [MarkdownView](https://github.com/Lakr233/MarkdownView) (since WKWebView is not available in QL extensions).
+
+## Acknowledgements
+
+- [MarkdownView](https://github.com/Lakr233/MarkdownView) by Lakr233, native markdown rendering for the QuickLook extension
+- [Litext](https://github.com/Lakr233/Litext) by Lakr233, rich text rendering library
+- [Highlightr](https://github.com/raspu/Highlightr) by raspu, syntax highlighting via highlight.js
+- [swift-cmark](https://github.com/swiftlang/swift-cmark) (cmark-gfm), GFM-compliant markdown parsing
+- [apple/swift-markdown](https://github.com/apple/swift-markdown), Swift markdown parsing
+- [SwiftMath](https://github.com/mgriebling/SwiftMath) by mgriebling, LaTeX math rendering
+
+## License
+
+MIT
