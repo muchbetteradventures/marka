@@ -20,6 +20,7 @@ if [[ -z "${KEYCHAIN_PROFILE:-}" ]]; then
 fi
 
 BINARY_NAME="marka"
+APP_NAME="Marka"
 
 # --- Auto-version from conventional commits ---
 
@@ -54,41 +55,65 @@ echo "==> Version bump: ${CURRENT_VERSION} -> ${VERSION} (${BUMP})"
 # Update Version.swift
 sed -i '' "s/markaVersion = \".*\"/markaVersion = \"${VERSION}\"/" Sources/Marka/Version.swift
 
-# Update Info.plist
-/usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${VERSION}" Info.plist
-/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${VERSION}" Info.plist
+# Update Info.plists
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${VERSION}" Marka-Info.plist
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${VERSION}" Marka-Info.plist
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${VERSION}" MarkdownPreview-Info.plist
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${VERSION}" MarkdownPreview-Info.plist
 
 # Commit version bump and tag
-git add Sources/Marka/Version.swift Info.plist
+git add Sources/Marka/Version.swift Marka-Info.plist MarkdownPreview-Info.plist
 git commit -m "release: v${VERSION}"
 git tag "v${VERSION}"
 
 echo "==> Tagged v${VERSION}"
 
-# --- Build, sign, notarize ---
+# --- Generate Xcode project ---
+
+echo "==> Generating Xcode project..."
+xcodegen generate
+
+# --- Build ---
 
 echo "==> Building release..."
-swift build -c release
+xcodebuild -project "${APP_NAME}.xcodeproj" \
+    -scheme "${APP_NAME}" \
+    -configuration Release \
+    -derivedDataPath .build/DerivedData \
+    build
 
-BINARY=".build/release/${BINARY_NAME}"
+APP_PATH=".build/DerivedData/Build/Products/Release/${APP_NAME}.app"
+BINARY="${APP_PATH}/Contents/MacOS/${APP_NAME}"
+
+if [[ ! -d "${APP_PATH}" ]]; then
+    echo "Error: Build product not found at ${APP_PATH}"
+    exit 1
+fi
+
+# --- Sign ---
 
 echo "==> Signing with hardened runtime..."
 codesign --sign "${SIGNING_IDENTITY}" \
          --options runtime \
          --force \
-         "${BINARY}"
+         --deep \
+         "${APP_PATH}"
 
 echo "==> Verifying signature..."
-codesign --verify --verbose "${BINARY}"
+codesign --verify --verbose --deep "${APP_PATH}"
 
 DMG_NAME="${BINARY_NAME}-${VERSION}.dmg"
 TAR_NAME="${BINARY_NAME}-${VERSION}.tar.gz"
 
 echo "==> Creating ${DMG_NAME}..."
 STAGING_DIR=$(mktemp -d)
-cp "${BINARY}" "${STAGING_DIR}/${BINARY_NAME}"
+cp -R "${APP_PATH}" "${STAGING_DIR}/"
+
+# Create a symlink to /Applications for drag-install
+ln -s /Applications "${STAGING_DIR}/Applications"
+
 rm -f "${DMG_NAME}"
-hdiutil create -volname "Marka ${VERSION}" \
+hdiutil create -volname "${APP_NAME} ${VERSION}" \
     -srcfolder "${STAGING_DIR}" \
     -ov -format UDZO \
     "${DMG_NAME}"
@@ -98,7 +123,7 @@ echo "==> Signing .dmg..."
 codesign --sign "${SIGNING_IDENTITY}" "${DMG_NAME}"
 
 echo "==> Creating ${TAR_NAME} for Homebrew..."
-tar -czf "${TAR_NAME}" -C .build/release "${BINARY_NAME}"
+tar -czf "${TAR_NAME}" -C ".build/DerivedData/Build/Products/Release" "${APP_NAME}.app"
 
 echo "==> Submitting .dmg for notarization (this may take a minute)..."
 xcrun notarytool submit "${DMG_NAME}" \
@@ -113,10 +138,9 @@ xcrun stapler staple "${DMG_NAME}"
 
 echo ""
 echo "==> Build complete. v${VERSION}"
-echo "  Signed binary at: ${BINARY}"
+echo "  App bundle:       ${APP_PATH}"
 echo "  DMG:              ${DMG_NAME}"
 echo "  Homebrew tarball:  ${TAR_NAME}"
-echo "  Install locally:  cp ${BINARY} ~/.local/bin/${BINARY_NAME}"
 
 # --- Publish ---
 

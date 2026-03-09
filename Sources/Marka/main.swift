@@ -15,6 +15,15 @@ case .showVersion:
     print("marka \(markaVersion)")
     exit(0)
 
+case .launchApp:
+    let app = NSApplication.shared
+    app.setActivationPolicy(.regular)
+
+    let delegate = AppDelegate()
+    app.delegate = delegate
+
+    app.run()
+
 case .run(let args):
     // --- IPC: try handing off to running instance ---
 

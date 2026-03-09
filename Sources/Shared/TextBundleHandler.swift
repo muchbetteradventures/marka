@@ -139,9 +139,24 @@ enum TextBundleHandler {
             throw TextBundleError.extractionFailed
         }
 
+        // Find the textbundle inside the extracted directory
+        // (the zip may contain a nested .textbundle directory, or the content may be at root)
+        let bundlePath: String
+        do {
+            let extracted = try FileManager.default.contentsOfDirectory(at: tempURL, includingPropertiesForKeys: nil)
+            if let nested = extracted.first(where: { $0.pathExtension == "textbundle" }) {
+                bundlePath = nested.path
+            } else {
+                bundlePath = tempDir
+            }
+        } catch {
+            try? FileManager.default.removeItem(at: tempURL)
+            throw TextBundleError.extractionFailed
+        }
+
         // Now load as a regular textbundle
         do {
-            var content = try loadTextBundle(path: tempDir)
+            var content = try loadTextBundle(path: bundlePath)
             // Mark as textpack and store extracted path for cleanup
             content = TextBundleContent(
                 markdownContent: content.markdownContent,

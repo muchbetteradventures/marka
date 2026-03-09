@@ -17,6 +17,7 @@ enum LaunchAction {
     case showHelp
     case showVersion
     case run(ParsedArguments)
+    case launchApp
 }
 
 enum ArgumentParser {
@@ -119,8 +120,12 @@ enum ArgumentParser {
                 extractedPath: nil
             ))
 
-        } else {
+        } else if isatty(STDIN_FILENO) != 0 && !isChildProcess {
+            // Terminal with no arguments: show help if running interactively,
+            // launch app with file dialog if opened from Finder (no TTY)
             return .showHelp
+        } else {
+            return .launchApp
         }
     }
 

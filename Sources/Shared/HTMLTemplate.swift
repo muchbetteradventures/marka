@@ -1,7 +1,7 @@
 import Foundation
 
 enum HTMLTemplate {
-    static func fullPage(markdown: String) -> String {
+    static func fullPage(markdown: String, narrowLayout: Bool = false) -> String {
         let escapedMarkdown = markdown.jsTemplateEscaped
         return """
         <!DOCTYPE html>
@@ -17,7 +17,7 @@ enum HTMLTemplate {
         \(appScriptBlock)
         <script>
         updateMarkdown(`\(escapedMarkdown)`);
-        window.markaSetNarrowLayout(\(UserDefaults.standard.bool(forKey: "narrowLayout") ? "true" : "false"));
+        window.markaSetNarrowLayout(\(narrowLayout ? "true" : "false"));
         </script>
         </body>
         </html>

@@ -18,7 +18,7 @@ struct MarkdownWebView: NSViewRepresentable {
         context.coordinator.webView = webView
 
         // Load initial content
-        let html = HTMLTemplate.fullPage(markdown: document.markdown)
+        let html = HTMLTemplate.fullPage(markdown: document.markdown, narrowLayout: UserDefaults.standard.bool(forKey: "narrowLayout"))
         webView.loadHTMLString(html, baseURL: document.baseURL)
         context.coordinator.lastMarkdown = document.markdown
 
@@ -33,7 +33,7 @@ struct MarkdownWebView: NSViewRepresentable {
             pushMarkdownUpdate(webView: webView, markdown: document.markdown)
         } else {
             // Page not yet loaded, reload entirely
-            let html = HTMLTemplate.fullPage(markdown: document.markdown)
+            let html = HTMLTemplate.fullPage(markdown: document.markdown, narrowLayout: UserDefaults.standard.bool(forKey: "narrowLayout"))
             webView.loadHTMLString(html, baseURL: document.baseURL)
         }
     }

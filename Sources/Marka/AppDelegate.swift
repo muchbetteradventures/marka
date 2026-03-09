@@ -1,15 +1,16 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 import WebKit
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var windowInfos: [(window: NSWindow, document: MarkdownDocument, watcher: FileWatcher?, webView: WKWebView?, tempPath: String?, extractedPath: String?)] = []
     private let ipcServer = IPCServer()
-    private let initialDocument: IPCPayload
+    private let initialDocument: IPCPayload?
     private var menuBarBuilder: MenuBarBuilder!
 
-    init(initialDocument: IPCPayload) {
+    init(initialDocument: IPCPayload? = nil) {
         self.initialDocument = initialDocument
         super.init()
     }
@@ -40,8 +41,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         ipcServer.start()
 
-        // Open the initial document
-        openDocument(payload: initialDocument)
+        // Open the initial document, or show file picker
+        if let initialDocument {
+            openDocument(payload: initialDocument)
+        } else {
+            showOpenDialog()
+        }
 
         NSApp.activate(ignoringOtherApps: true)
     }
@@ -99,6 +104,63 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             tempPath: payload.isTemp ? payload.path : nil,
             extractedPath: payload.extractedPath
         ))
+    }
+
+    // MARK: - Open Dialog
+
+    func showOpenDialog() {
+        let panel = NSOpenPanel()
+        panel.title = "Open Markdown File"
+        panel.allowedContentTypes = [
+            .init(filenameExtension: "md")!,
+            .init(filenameExtension: "markdown")!,
+            .init(filenameExtension: "textbundle")!,
+            .init(filenameExtension: "textpack")!,
+        ]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = true  // for .textbundle packages
+
+        guard panel.runModal() == .OK, let url = panel.url else {
+            // User cancelled. If no windows are open, quit.
+            if windowInfos.isEmpty {
+                NSApp.terminate(nil)
+            }
+            return
+        }
+
+        let path = url.path
+
+        if TextBundleHandler.isTextBundle(path: path) {
+            do {
+                let bundle = try TextBundleHandler.load(path: path)
+                let payload = IPCPayload(
+                    path: bundle.markdownFilePath,
+                    isTemp: bundle.isTextPack,
+                    title: bundle.title,
+                    baseURL: (bundle.assetsPath ?? URL(fileURLWithPath: bundle.markdownFilePath).deletingLastPathComponent()).absoluteString,
+                    isTextBundle: true,
+                    bundlePath: bundle.bundlePath,
+                    extractedPath: bundle.extractedPath
+                )
+                openDocument(payload: payload)
+            } catch {
+                let alert = NSAlert()
+                alert.messageText = "Could not open file"
+                alert.informativeText = error.localizedDescription
+                alert.runModal()
+            }
+        } else {
+            let payload = IPCPayload(
+                path: path,
+                isTemp: false,
+                title: url.lastPathComponent,
+                baseURL: url.deletingLastPathComponent().absoluteString,
+                isTextBundle: false,
+                bundlePath: nil,
+                extractedPath: nil
+            )
+            openDocument(payload: payload)
+        }
     }
 
     // MARK: - NSWindowDelegate
