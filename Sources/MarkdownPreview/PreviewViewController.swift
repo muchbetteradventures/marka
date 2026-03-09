@@ -44,22 +44,8 @@ class PreviewViewController: NSViewController, @preconcurrency QLPreviewingContr
                 return
             }
 
-            let renderedHTML = QLMarkdownRenderer.render(markdown)
-            let styledHTML = QLHTMLTemplate.page(renderedHTML: renderedHTML)
-
-            guard let data = styledHTML.data(using: .utf8),
-                  let attributedString = NSAttributedString(
-                    html: data,
-                    options: [
-                        .documentType: NSAttributedString.DocumentType.html,
-                        .characterEncoding: String.Encoding.utf8.rawValue
-                    ],
-                    documentAttributes: nil
-                  ) else {
-                handler(QLPreviewError.renderFailed)
-                return
-            }
-
+            var renderer = QLMarkdownRenderer()
+            let attributedString = renderer.attributedString(from: markdown)
             textView.textStorage?.setAttributedString(attributedString)
             handler(nil)
         } catch {

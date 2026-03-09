@@ -1,4 +1,10 @@
 name: Marka
+
+packages:
+  swift-markdown:
+    url: https://github.com/apple/swift-markdown.git
+    branch: main
+
 options:
   bundleIdPrefix: com.marka
   deploymentTarget:
@@ -49,4 +55,6 @@ targets:
       INFOPLIST_FILE: MarkdownPreview-Info.plist
       GENERATE_INFOPLIST_FILE: NO
       SKIP_INSTALL: YES
-    dependencies: []
+    dependencies:
+      - package: swift-markdown
+        product: Markdown
