@@ -4,6 +4,10 @@ packages:
   swift-markdown:
     url: https://github.com/apple/swift-markdown.git
     branch: main
+  MarkdownView:
+    path: ../MarkdownView
+  Litext:
+    path: ../Litext
 
 options:
   bundleIdPrefix: com.marka
@@ -58,3 +62,7 @@ targets:
     dependencies:
       - package: swift-markdown
         product: Markdown
+      - package: MarkdownView
+        product: MarkdownView
+      - package: MarkdownView
+        product: MarkdownParser
