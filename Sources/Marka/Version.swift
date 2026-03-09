@@ -1,1 +1,1 @@
-let markaVersion = "0.3.0"
+let markaVersion = "0.4.0"
