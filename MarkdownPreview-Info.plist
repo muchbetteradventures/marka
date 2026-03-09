@@ -26,8 +26,6 @@
 	<dict>
 		<key>NSExtensionAttributes</key>
 		<dict>
-			<key>QLSupportsSearchableItems</key>
-			<true/>
 			<key>QLSupportedContentTypes</key>
 			<array>
 				<string>net.daringfireball.markdown</string>
@@ -35,6 +33,8 @@
 				<string>org.textbundle.textpack</string>
 				<string>org.textbundle.compressed</string>
 			</array>
+			<key>QLSupportsSearchableItems</key>
+			<true/>
 		</dict>
 		<key>NSExtensionPointIdentifier</key>
 		<string>com.apple.quicklook.preview</string>
