@@ -2,6 +2,7 @@
 
 ## v0.7.1 (2026-03-10)
 - **Table and code block layout fix**: use CTRunDelegate for proper height reservation in text flow, fixing text bleeding through tables
+- **Scroll passthrough**: tables and code blocks no longer capture scroll events, page scrolls smoothly over them
 
 ## v0.7.0 (2026-03-10)
 - **Image rendering**: inline images from local files and relative paths via LTXAttachment
