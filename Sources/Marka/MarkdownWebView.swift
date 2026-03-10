@@ -1,68 +1,137 @@
+import AppKit
+import MarkdownParser
+import MarkdownView
 import SwiftUI
-import WebKit
 
-struct MarkdownWebView: NSViewRepresentable {
+struct MarkdownNativeView: NSViewRepresentable {
     let document: MarkdownDocument
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
     }
 
-    func makeNSView(context: Context) -> WKWebView {
-        let config = WKWebViewConfiguration()
-        config.preferences.setValue(true, forKey: "developerExtrasEnabled")
+    func makeNSView(context: Context) -> NSScrollView {
+        let scrollView = NSScrollView(frame: .zero)
+        scrollView.hasVerticalScroller = true
+        scrollView.autoresizingMask = [.width, .height]
+        scrollView.drawsBackground = true
 
-        let webView = WKWebView(frame: .zero, configuration: config)
-        webView.navigationDelegate = context.coordinator
-        webView.setValue(false, forKey: "drawsBackground")
-        context.coordinator.webView = webView
-
-        // Load initial content
-        let html = HTMLTemplate.fullPage(markdown: document.markdown, narrowLayout: UserDefaults.standard.bool(forKey: "narrowLayout"))
-        webView.loadHTMLString(html, baseURL: document.baseURL)
-        context.coordinator.lastMarkdown = document.markdown
-
-        return webView
-    }
-
-    func updateNSView(_ webView: WKWebView, context: Context) {
-        guard document.markdown != context.coordinator.lastMarkdown else { return }
-        context.coordinator.lastMarkdown = document.markdown
-
-        if context.coordinator.pageLoaded {
-            pushMarkdownUpdate(webView: webView, markdown: document.markdown)
-        } else {
-            // Page not yet loaded, reload entirely
-            let html = HTMLTemplate.fullPage(markdown: document.markdown, narrowLayout: UserDefaults.standard.bool(forKey: "narrowLayout"))
-            webView.loadHTMLString(html, baseURL: document.baseURL)
-        }
-    }
-
-    private func pushMarkdownUpdate(webView: WKWebView, markdown: String) {
-        let escaped = markdown.jsTemplateEscaped
-        webView.evaluateJavaScript("updateMarkdown(`\(escaped)`)")
-    }
-
-    final class Coordinator: NSObject, WKNavigationDelegate {
-        var webView: WKWebView?
-        var lastMarkdown: String = ""
-        var pageLoaded = false
-
-        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            pageLoaded = true
-        }
-
-        func webView(
-            _ webView: WKWebView,
-            decidePolicyFor navigationAction: WKNavigationAction,
-            decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void
-        ) {
-            if navigationAction.navigationType == .linkActivated,
-               let url = navigationAction.request.url {
+        let markdownTextView = MarkdownTextView()
+        markdownTextView.linkHandler = { payload, _, _ in
+            switch payload {
+            case .url(let url):
                 NSWorkspace.shared.open(url)
-                decisionHandler(.cancel)
-            } else {
-                decisionHandler(.allow)
+            case .string(let str):
+                if let url = URL(string: str) {
+                    NSWorkspace.shared.open(url)
+                }
+            }
+        }
+
+        scrollView.documentView = markdownTextView
+        scrollView.contentView.postsBoundsChangedNotifications = true
+        markdownTextView.bindContentOffset(from: scrollView)
+
+        context.coordinator.markdownTextView = markdownTextView
+        context.coordinator.scrollView = scrollView
+
+        // Register so AppDelegate can find this coordinator
+        AppDelegate.coordinatorRegistry[ObjectIdentifier(markdownTextView)] = context.coordinator
+        context.coordinator.observeFrameChanges()
+
+        renderContent(markdownTextView: markdownTextView, scrollView: scrollView, coordinator: context.coordinator)
+
+        return scrollView
+    }
+
+    func updateNSView(_ scrollView: NSScrollView, context: Context) {
+        guard document.markdown != context.coordinator.lastMarkdown,
+              let markdownTextView = context.coordinator.markdownTextView else { return }
+
+        renderContent(markdownTextView: markdownTextView, scrollView: scrollView, coordinator: context.coordinator)
+    }
+
+    private func renderContent(markdownTextView: MarkdownTextView, scrollView: NSScrollView, coordinator: Coordinator) {
+        coordinator.lastMarkdown = document.markdown
+
+        let isDark = scrollView.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        let theme = MarkdownGitHubTheme.theme(dark: isDark)
+        let scaledTheme = coordinator.applyZoom(to: theme)
+
+        let parser = MarkdownParser()
+        let result = parser.parse(document.markdown)
+        let content = MarkdownTextView.PreprocessedContent(parserResult: result, theme: scaledTheme)
+
+        markdownTextView.theme = scaledTheme
+        markdownTextView.setMarkdownManually(content)
+
+        let bgColor = MarkdownGitHubTheme.backgroundColor(dark: isDark)
+        markdownTextView.wantsLayer = true
+        markdownTextView.layer?.backgroundColor = bgColor.cgColor
+        scrollView.backgroundColor = bgColor
+
+        Self.relayout(markdownTextView: markdownTextView, scrollView: scrollView, coordinator: coordinator)
+    }
+
+    static func relayout(markdownTextView: MarkdownTextView, scrollView: NSScrollView, coordinator: Coordinator) {
+        let padding = coordinator.padding
+        let scrollWidth = scrollView.contentView.bounds.width
+        guard scrollWidth > 0 else { return }
+
+        var contentWidth = scrollWidth - (padding * 2)
+        if coordinator.narrowLayout {
+            contentWidth = min(contentWidth, 980)
+        }
+
+        markdownTextView.textView.preferredMaxLayoutWidth = contentWidth
+        let contentSize = markdownTextView.boundingSize(for: contentWidth)
+        markdownTextView.frame = NSRect(x: 0, y: 0, width: contentWidth, height: contentSize.height)
+
+        scrollView.automaticallyAdjustsContentInsets = false
+        if coordinator.narrowLayout && scrollWidth - (padding * 2) > 980 {
+            let sideInset = (scrollWidth - 980) / 2
+            scrollView.contentInsets = NSEdgeInsets(top: padding, left: sideInset, bottom: padding, right: sideInset)
+            scrollView.scrollerInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: -sideInset)
+        } else {
+            scrollView.contentInsets = NSEdgeInsets(top: padding, left: padding, bottom: padding, right: padding)
+            scrollView.scrollerInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: -padding)
+        }
+    }
+
+    final class Coordinator: NSObject {
+        var markdownTextView: MarkdownTextView?
+        var scrollView: NSScrollView?
+        var lastMarkdown: String = ""
+        let padding: CGFloat = 32.0
+        var narrowLayout: Bool = UserDefaults.standard.bool(forKey: "narrowLayout")
+        var zoomLevel: CGFloat = 1.0
+        var frameObserver: NSObjectProtocol?
+
+        func applyZoom(to theme: MarkdownTheme) -> MarkdownTheme {
+            guard zoomLevel != 1.0 else { return theme }
+            var t = theme
+            t.align(to: 16.0 * zoomLevel)
+            return t
+        }
+
+        func observeFrameChanges() {
+            guard let scrollView = scrollView, frameObserver == nil else { return }
+            scrollView.contentView.postsFrameChangedNotifications = true
+            frameObserver = NotificationCenter.default.addObserver(
+                forName: NSView.frameDidChangeNotification,
+                object: scrollView.contentView,
+                queue: .main
+            ) { [weak self] _ in
+                guard let self = self,
+                      let mtv = self.markdownTextView,
+                      let sv = self.scrollView else { return }
+                MarkdownNativeView.relayout(markdownTextView: mtv, scrollView: sv, coordinator: self)
+            }
+        }
+
+        deinit {
+            if let observer = frameObserver {
+                NotificationCenter.default.removeObserver(observer)
             }
         }
     }

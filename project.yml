@@ -40,6 +40,10 @@ targets:
       INFOPLIST_FILE: Marka-Info.plist
       GENERATE_INFOPLIST_FILE: NO
     dependencies:
+      - package: MarkdownView
+        product: MarkdownView
+      - package: MarkdownView
+        product: MarkdownParser
       - target: MarkdownPreview
         embed: true
         codeSign: true

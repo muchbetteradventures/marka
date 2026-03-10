@@ -67,7 +67,7 @@ class PreviewViewController: NSViewController, @preconcurrency QLPreviewingContr
             }
 
             let isDark = view.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-            let theme = Self.githubTheme(dark: isDark)
+            let theme = MarkdownGitHubTheme.theme(dark: isDark)
 
             let parser = MarkdownParser()
             let result = parser.parse(markdown)
@@ -77,10 +77,7 @@ class PreviewViewController: NSViewController, @preconcurrency QLPreviewingContr
             markdownTextView.bindContentOffset(from: scrollView)
             relayoutMarkdown()
 
-            // Set background colour to match GitHub
-            let bgColor = isDark
-                ? NSColor(red: 0.051, green: 0.067, blue: 0.09, alpha: 1.0)  // #0d1117
-                : NSColor.white
+            let bgColor = MarkdownGitHubTheme.backgroundColor(dark: isDark)
             markdownTextView.wantsLayer = true
             markdownTextView.layer?.backgroundColor = bgColor.cgColor
             scrollView.backgroundColor = bgColor
@@ -92,55 +89,6 @@ class PreviewViewController: NSViewController, @preconcurrency QLPreviewingContr
         }
     }
 
-    /// Build a MarkdownTheme that matches the GitHub CSS from the WKWebView app.
-    private static func githubTheme(dark: Bool) -> MarkdownTheme {
-        var theme = MarkdownTheme()
-
-        // Base font: 16px, line-height 1.5
-        let bodySize: CGFloat = 16.0
-        theme.align(to: bodySize)
-
-        // Colours from HTMLStyles.swift CSS variables
-        if dark {
-            // --fgColor-default: #f0f6fc / #e6edf3
-            theme.colors.body = NSColor(red: 0.941, green: 0.965, blue: 0.988, alpha: 1.0)
-            // --fgColor-accent: #4493f8
-            theme.colors.highlight = NSColor(red: 0.267, green: 0.576, blue: 0.973, alpha: 1.0)
-            theme.colors.emphasis = NSColor(red: 0.267, green: 0.576, blue: 0.973, alpha: 1.0)
-            // Code text: --fgColor-default on --bgColor-muted
-            theme.colors.code = NSColor(red: 0.902, green: 0.929, blue: 0.953, alpha: 1.0)
-            // --bgColor-muted: #161b22
-            theme.colors.codeBackground = NSColor(red: 0.086, green: 0.106, blue: 0.133, alpha: 1.0)
-            // Selection
-            theme.colors.selectionBackground = NSColor(red: 0.267, green: 0.576, blue: 0.973, alpha: 0.2)
-            // Table
-            theme.table.borderColor = NSColor(red: 0.239, green: 0.263, blue: 0.302, alpha: 1.0) // #3d444d
-            theme.table.headerBackgroundColor = NSColor(red: 0.086, green: 0.106, blue: 0.133, alpha: 1.0)
-            theme.table.stripeCellBackgroundColor = NSColor(red: 0.086, green: 0.106, blue: 0.133, alpha: 0.5)
-        } else {
-            // --fgColor-default: #1f2328
-            theme.colors.body = NSColor(red: 0.122, green: 0.137, blue: 0.157, alpha: 1.0)
-            // --fgColor-accent: #0969da
-            theme.colors.highlight = NSColor(red: 0.035, green: 0.412, blue: 0.855, alpha: 1.0)
-            theme.colors.emphasis = NSColor(red: 0.035, green: 0.412, blue: 0.855, alpha: 1.0)
-            // Code text
-            theme.colors.code = NSColor(red: 0.122, green: 0.137, blue: 0.157, alpha: 1.0)
-            // --bgColor-muted: #f6f8fa
-            theme.colors.codeBackground = NSColor(red: 0.965, green: 0.973, blue: 0.98, alpha: 1.0)
-            // Selection
-            theme.colors.selectionBackground = NSColor(red: 0.035, green: 0.412, blue: 0.855, alpha: 0.2)
-            // Table
-            theme.table.borderColor = NSColor(red: 0.82, green: 0.851, blue: 0.878, alpha: 1.0) // #d1d9e0
-            theme.table.headerBackgroundColor = NSColor(red: 0.965, green: 0.973, blue: 0.98, alpha: 1.0)
-            theme.table.stripeCellBackgroundColor = NSColor(red: 0.965, green: 0.973, blue: 0.98, alpha: 0.5)
-        }
-
-        // Spacings
-        theme.spacings.general = 10
-        theme.spacings.list = 4
-
-        return theme
-    }
 }
 
 /// Minimal ZIP-based TextPack reader for sandboxed environments.

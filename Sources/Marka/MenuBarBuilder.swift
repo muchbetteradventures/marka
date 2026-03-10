@@ -1,23 +1,31 @@
 import AppKit
-import WebKit
 
 @MainActor
 final class MenuBarBuilder: NSObject, NSMenuItemValidation {
-    private let evaluateJS: (String) -> Void
-    private let evaluateJSWithResult: (String, @escaping (String?) -> Void) -> Void
+    private let showFind: () -> Void
+    private let copyRichText: () -> Void
+    private let zoomIn: () -> Void
+    private let zoomOut: () -> Void
+    private let actualSize: () -> Void
+    private let toggleNarrowLayout: () -> Void
     private let openDocument: (IPCPayload) -> Void
-    private let evaluateJSAllWindows: (String) -> Void
 
     init(
-        evaluateJS: @escaping (String) -> Void,
-        evaluateJSWithResult: @escaping (String, @escaping (String?) -> Void) -> Void,
-        openDocument: @escaping (IPCPayload) -> Void,
-        evaluateJSAllWindows: @escaping (String) -> Void
+        showFind: @escaping () -> Void,
+        copyRichText: @escaping () -> Void,
+        zoomIn: @escaping () -> Void,
+        zoomOut: @escaping () -> Void,
+        actualSize: @escaping () -> Void,
+        toggleNarrowLayout: @escaping () -> Void,
+        openDocument: @escaping (IPCPayload) -> Void
     ) {
-        self.evaluateJS = evaluateJS
-        self.evaluateJSWithResult = evaluateJSWithResult
+        self.showFind = showFind
+        self.copyRichText = copyRichText
+        self.zoomIn = zoomIn
+        self.zoomOut = zoomOut
+        self.actualSize = actualSize
+        self.toggleNarrowLayout = toggleNarrowLayout
         self.openDocument = openDocument
-        self.evaluateJSAllWindows = evaluateJSAllWindows
         super.init()
     }
 
@@ -43,18 +51,18 @@ final class MenuBarBuilder: NSObject, NSMenuItemValidation {
         fileMenuItem.submenu = fileMenu
         mainMenu.addItem(fileMenuItem)
 
-        // Edit menu (for copy support)
+        // Edit menu
         let editMenuItem = NSMenuItem()
         let editMenu = NSMenu(title: "Edit")
         editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
         editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
         editMenu.addItem(.separator())
-        let copyRichTextItem = NSMenuItem(title: "Copy as Rich Text", action: #selector(copyAsRichText), keyEquivalent: "C")
+        let copyRichTextItem = NSMenuItem(title: "Copy as Rich Text", action: #selector(doCopyRichText), keyEquivalent: "C")
         copyRichTextItem.keyEquivalentModifierMask = [.command, .shift]
         copyRichTextItem.target = self
         editMenu.addItem(copyRichTextItem)
         editMenu.addItem(.separator())
-        let findItem = NSMenuItem(title: "Find\u{2026}", action: #selector(showFind), keyEquivalent: "f")
+        let findItem = NSMenuItem(title: "Find\u{2026}", action: #selector(doShowFind), keyEquivalent: "f")
         findItem.target = self
         editMenu.addItem(findItem)
         editMenuItem.submenu = editMenu
@@ -67,18 +75,18 @@ final class MenuBarBuilder: NSObject, NSMenuItemValidation {
         keepOnTopItem.keyEquivalentModifierMask = [.command, .shift]
         keepOnTopItem.target = self
         viewMenu.addItem(keepOnTopItem)
-        let narrowLayoutItem = NSMenuItem(title: "Narrow Layout", action: #selector(toggleNarrowLayout), keyEquivalent: "N")
+        let narrowLayoutItem = NSMenuItem(title: "Narrow Layout", action: #selector(doToggleNarrowLayout), keyEquivalent: "N")
         narrowLayoutItem.keyEquivalentModifierMask = [.command, .shift]
         narrowLayoutItem.target = self
         viewMenu.addItem(narrowLayoutItem)
         viewMenu.addItem(.separator())
-        let actualSizeItem = NSMenuItem(title: "Actual Size", action: #selector(actualSize), keyEquivalent: "0")
+        let actualSizeItem = NSMenuItem(title: "Actual Size", action: #selector(doActualSize), keyEquivalent: "0")
         actualSizeItem.target = self
         viewMenu.addItem(actualSizeItem)
-        let zoomInItem = NSMenuItem(title: "Zoom In", action: #selector(zoomIn), keyEquivalent: "+")
+        let zoomInItem = NSMenuItem(title: "Zoom In", action: #selector(doZoomIn), keyEquivalent: "+")
         zoomInItem.target = self
         viewMenu.addItem(zoomInItem)
-        let zoomOutItem = NSMenuItem(title: "Zoom Out", action: #selector(zoomOut), keyEquivalent: "-")
+        let zoomOutItem = NSMenuItem(title: "Zoom Out", action: #selector(doZoomOut), keyEquivalent: "-")
         zoomOutItem.target = self
         viewMenu.addItem(zoomOutItem)
         viewMenuItem.submenu = viewMenu
@@ -97,9 +105,12 @@ final class MenuBarBuilder: NSObject, NSMenuItemValidation {
 
     // MARK: - Actions
 
-    @objc private func showFind() {
-        evaluateJS("window.markaOpenFind()")
-    }
+    @objc private func doShowFind() { showFind() }
+    @objc private func doCopyRichText() { copyRichText() }
+    @objc private func doZoomIn() { zoomIn() }
+    @objc private func doZoomOut() { zoomOut() }
+    @objc private func doActualSize() { actualSize() }
+    @objc private func doToggleNarrowLayout() { toggleNarrowLayout() }
 
     @objc private func toggleKeepOnTop() {
         guard let window = NSApp.keyWindow else { return }
@@ -107,17 +118,6 @@ final class MenuBarBuilder: NSObject, NSMenuItemValidation {
             window.level = .normal
         } else {
             window.level = .floating
-        }
-    }
-
-    @objc private func copyAsRichText() {
-        evaluateJSWithResult("window.markaGetContentHTML()") { html in
-            guard let html = html, !html.isEmpty else { return }
-            guard let data = html.data(using: .utf8),
-                  let attrStr = NSAttributedString(html: data, documentAttributes: nil) else { return }
-            let pasteboard = NSPasteboard.general
-            pasteboard.clearContents()
-            pasteboard.writeObjects([attrStr])
         }
     }
 
@@ -136,31 +136,6 @@ final class MenuBarBuilder: NSObject, NSMenuItemValidation {
         openDocument(IPCPayload(path: tempPath, isTemp: true, title: "Clipboard", baseURL: nil, isTextBundle: false, bundlePath: nil, extractedPath: nil))
     }
 
-    @objc private func toggleNarrowLayout() {
-        let current = UserDefaults.standard.bool(forKey: "narrowLayout")
-        let newValue = !current
-        UserDefaults.standard.set(newValue, forKey: "narrowLayout")
-        evaluateJSAllWindows("window.markaSetNarrowLayout(\(newValue))")
-    }
-
-    @objc private func actualSize() {
-        evaluateJS("document.body.style.zoom = '1'")
-    }
-
-    @objc private func zoomIn() {
-        evaluateJS("""
-            var z = parseFloat(document.body.style.zoom || '1');
-            document.body.style.zoom = String(Math.min(z + 0.1, 3));
-        """)
-    }
-
-    @objc private func zoomOut() {
-        evaluateJS("""
-            var z = parseFloat(document.body.style.zoom || '1');
-            document.body.style.zoom = String(Math.max(z - 0.1, 0.3));
-        """)
-    }
-
     // MARK: - Validation
 
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
@@ -168,10 +143,10 @@ final class MenuBarBuilder: NSObject, NSMenuItemValidation {
             menuItem.state = NSApp.keyWindow?.level == .floating ? .on : .off
             return NSApp.keyWindow != nil
         }
-        if menuItem.action == #selector(copyAsRichText) {
+        if menuItem.action == #selector(doCopyRichText) {
             return NSApp.keyWindow != nil
         }
-        if menuItem.action == #selector(toggleNarrowLayout) {
+        if menuItem.action == #selector(doToggleNarrowLayout) {
             menuItem.state = UserDefaults.standard.bool(forKey: "narrowLayout") ? .on : .off
             return true
         }

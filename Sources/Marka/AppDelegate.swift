@@ -1,11 +1,12 @@
 import AppKit
+import MarkdownParser
+import MarkdownView
 import SwiftUI
 import UniformTypeIdentifiers
-import WebKit
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
-    private var windowInfos: [(window: NSWindow, document: MarkdownDocument, watcher: FileWatcher?, webView: WKWebView?, tempPath: String?, extractedPath: String?)] = []
+    private var windowInfos: [(window: NSWindow, document: MarkdownDocument, watcher: FileWatcher?, tempPath: String?, extractedPath: String?)] = []
     private let ipcServer = IPCServer()
     private let initialDocument: IPCPayload?
     private var menuBarBuilder: MenuBarBuilder!
@@ -17,36 +18,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         menuBarBuilder = MenuBarBuilder(
-            evaluateJS: { [weak self] js in
-                self?.evaluateJS(js)
-            },
-            evaluateJSWithResult: { [weak self] js, handler in
-                self?.evaluateJSWithResult(js, handler: handler)
-            },
+            showFind: { [weak self] in self?.showFind() },
+            copyRichText: { [weak self] in self?.copyRichText() },
+            zoomIn: { [weak self] in self?.adjustZoom(delta: 0.1) },
+            zoomOut: { [weak self] in self?.adjustZoom(delta: -0.1) },
+            actualSize: { [weak self] in self?.resetZoom() },
+            toggleNarrowLayout: { [weak self] in self?.toggleNarrowLayout() },
             openDocument: { [weak self] payload in
                 self?.openDocument(payload: payload)
-            },
-            evaluateJSAllWindows: { [weak self] js in
-                self?.evaluateJSAllWindows(js)
             }
         )
         let menus = menuBarBuilder.buildMenuBar()
         NSApp.mainMenu = menus.mainMenu
         NSApp.windowsMenu = menus.windowMenu
 
-        // Start IPC server for subsequent invocations
         ipcServer.onOpenDocument = { [weak self] payload in
             self?.openDocument(payload: payload)
             NSApp.activate(ignoringOtherApps: true)
         }
         ipcServer.start()
 
-        // Open the initial document, or show file picker
         if let initialDocument {
             openDocument(payload: initialDocument)
         } else {
             showOpenDialog()
         }
+
+        KeyboardScrollHandler.shared.install()
 
         NSApp.activate(ignoringOtherApps: true)
     }
@@ -78,7 +76,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         window.delegate = self
         window.center()
 
-        // Cascade from the last opened window
         if let lastWindow = windowInfos.last?.window {
             let origin = lastWindow.cascadeTopLeft(from: .zero)
             window.cascadeTopLeft(from: origin)
@@ -86,7 +83,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         window.makeKeyAndOrderFront(nil)
 
-        // Start file watcher for non-temp files
         var watcher: FileWatcher?
         if !payload.isTemp {
             let fw = FileWatcher(path: payload.path) { newContent in
@@ -100,7 +96,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             window: window,
             document: document,
             watcher: watcher,
-            webView: nil,
             tempPath: payload.isTemp ? payload.path : nil,
             extractedPath: payload.extractedPath
         ))
@@ -118,10 +113,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             .init(filenameExtension: "textpack")!,
         ]
         panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = true  // for .textbundle packages
+        panel.canChooseDirectories = true
 
         guard panel.runModal() == .OK, let url = panel.url else {
-            // User cancelled. If no windows are open, quit.
             if windowInfos.isEmpty {
                 NSApp.terminate(nil)
             }
@@ -174,12 +168,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let info = windowInfos[index]
         info.watcher?.stop()
 
-        // Clean up temp file for this window
         if let tempPath = info.tempPath {
             try? FileManager.default.removeItem(atPath: tempPath)
         }
-
-        // Clean up extracted textpack directory
         if let extractedPath = info.extractedPath {
             try? FileManager.default.removeItem(atPath: extractedPath)
         }
@@ -191,67 +182,93 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         true
     }
 
-    // MARK: - JS evaluation with cached WebView lookup
+    // MARK: - Native actions
 
-    private func evaluateJS(_ js: String) {
+    static var coordinatorRegistry: [ObjectIdentifier: MarkdownNativeView.Coordinator] = [:]
+
+    func coordinatorForKeyWindow() -> (MarkdownNativeView.Coordinator, MarkdownTextView, NSScrollView)? {
         guard let keyWindow = NSApp.keyWindow,
-              let index = windowInfos.firstIndex(where: { $0.window === keyWindow }) else { return }
-
-        // Use cached WebView if available, otherwise find and cache it
-        if let webView = windowInfos[index].webView {
-            webView.evaluateJavaScript(js)
-        } else if let hostingView = keyWindow.contentView,
-                  let webView = findWebView(in: hostingView) {
-            windowInfos[index].webView = webView
-            webView.evaluateJavaScript(js)
-        }
+              let hostingView = keyWindow.contentView else { return nil }
+        return findScrollViewWithMarkdown(in: hostingView)
     }
 
-    private func evaluateJSWithResult(_ js: String, handler: @escaping (String?) -> Void) {
-        guard let keyWindow = NSApp.keyWindow,
-              let index = windowInfos.firstIndex(where: { $0.window === keyWindow }) else {
-            handler(nil)
-            return
-        }
-
-        let webView: WKWebView?
-        if let cached = windowInfos[index].webView {
-            webView = cached
-        } else if let hostingView = keyWindow.contentView,
-                  let found = findWebView(in: hostingView) {
-            windowInfos[index].webView = found
-            webView = found
-        } else {
-            webView = nil
-        }
-
-        guard let wv = webView else {
-            handler(nil)
-            return
-        }
-
-        wv.evaluateJavaScript(js) { result, _ in
-            handler(result as? String)
-        }
-    }
-
-    private func evaluateJSAllWindows(_ js: String) {
-        for i in windowInfos.indices {
-            if let webView = windowInfos[i].webView {
-                webView.evaluateJavaScript(js)
-            } else if let hostingView = windowInfos[i].window.contentView,
-                      let webView = findWebView(in: hostingView) {
-                windowInfos[i].webView = webView
-                webView.evaluateJavaScript(js)
+    private func findScrollViewWithMarkdown(in view: NSView) -> (MarkdownNativeView.Coordinator, MarkdownTextView, NSScrollView)? {
+        if let scrollView = view as? NSScrollView,
+           let markdownTextView = scrollView.documentView as? MarkdownTextView {
+            // Find coordinator from registry
+            let id = ObjectIdentifier(markdownTextView)
+            if let coordinator = Self.coordinatorRegistry[id] {
+                return (coordinator, markdownTextView, scrollView)
             }
         }
-    }
-
-    private func findWebView(in view: NSView) -> WKWebView? {
-        if let wv = view as? WKWebView { return wv }
         for subview in view.subviews {
-            if let wv = findWebView(in: subview) { return wv }
+            if let result = findScrollViewWithMarkdown(in: subview) {
+                return result
+            }
         }
         return nil
+    }
+
+    private func showFind() {
+        guard let (coordinator, markdownTextView, scrollView) = coordinatorForKeyWindow() else { return }
+        // Toggle find bar
+        if let keyWindow = NSApp.keyWindow {
+            FindBarController.toggle(in: keyWindow, markdownTextView: markdownTextView, scrollView: scrollView)
+        }
+    }
+
+    private func copyRichText() {
+        guard let (_, markdownTextView, _) = coordinatorForKeyWindow() else { return }
+
+        let attrStr: NSAttributedString
+        if let range = markdownTextView.textView.selectionRange, range.length > 0 {
+            attrStr = markdownTextView.textView.attributedText.attributedSubstring(from: range)
+        } else {
+            attrStr = markdownTextView.textView.attributedText
+        }
+
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.writeObjects([attrStr])
+    }
+
+    private func adjustZoom(delta: CGFloat) {
+        guard let (coordinator, markdownTextView, scrollView) = coordinatorForKeyWindow() else { return }
+        coordinator.zoomLevel = max(0.5, min(3.0, coordinator.zoomLevel + delta))
+        rerender(coordinator: coordinator, markdownTextView: markdownTextView, scrollView: scrollView)
+    }
+
+    private func resetZoom() {
+        guard let (coordinator, markdownTextView, scrollView) = coordinatorForKeyWindow() else { return }
+        coordinator.zoomLevel = 1.0
+        rerender(coordinator: coordinator, markdownTextView: markdownTextView, scrollView: scrollView)
+    }
+
+    private func toggleNarrowLayout() {
+        let current = UserDefaults.standard.bool(forKey: "narrowLayout")
+        let newValue = !current
+        UserDefaults.standard.set(newValue, forKey: "narrowLayout")
+
+        // Apply to all windows
+        for info in windowInfos {
+            guard let hostingView = info.window.contentView,
+                  let (coordinator, mtv, sv) = findScrollViewWithMarkdown(in: hostingView) else { continue }
+            coordinator.narrowLayout = newValue
+            MarkdownNativeView.relayout(markdownTextView: mtv, scrollView: sv, coordinator: coordinator)
+        }
+    }
+
+    private func rerender(coordinator: MarkdownNativeView.Coordinator, markdownTextView: MarkdownTextView, scrollView: NSScrollView) {
+        let isDark = scrollView.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        let theme = MarkdownGitHubTheme.theme(dark: isDark)
+        let scaledTheme = coordinator.applyZoom(to: theme)
+
+        // Re-parse and re-render is needed because theme changed
+        let parser = MarkdownParser()
+        let result = parser.parse(coordinator.lastMarkdown)
+        let content = MarkdownTextView.PreprocessedContent(parserResult: result, theme: scaledTheme)
+        markdownTextView.theme = scaledTheme
+        markdownTextView.setMarkdownManually(content)
+        MarkdownNativeView.relayout(markdownTextView: markdownTextView, scrollView: scrollView, coordinator: coordinator)
     }
 }
