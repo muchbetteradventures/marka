@@ -9,7 +9,39 @@ struct HeadingIndex {
         let yPosition: CGFloat
     }
 
+    /// A parsed heading before y-position resolution.
+    struct ParsedHeading {
+        let level: Int
+        let text: String
+    }
+
     let entries: [Entry]
+
+    /// Parse ATX headings from markdown source. Pure function, no UI dependency.
+    static func parseHeadings(from markdown: String) -> [ParsedHeading] {
+        var headings: [ParsedHeading] = []
+        let lines = markdown.components(separatedBy: .newlines)
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard trimmed.hasPrefix("#") else { continue }
+
+            var level = 0
+            for ch in trimmed {
+                if ch == "#" { level += 1 } else { break }
+            }
+            guard level >= 1, level <= 6 else { continue }
+
+            // Must have a space after the #s (ATX spec)
+            let afterHashes = trimmed.dropFirst(level)
+            guard afterHashes.first == " " || afterHashes.isEmpty else { continue }
+
+            let headingText = String(afterHashes).trimmingCharacters(in: .whitespaces)
+            guard !headingText.isEmpty else { continue }
+
+            headings.append(ParsedHeading(level: level, text: headingText))
+        }
+        return headings
+    }
 
     /// Build a heading index by parsing the markdown source for heading lines,
     /// then finding their positions in the attributed string.
@@ -21,33 +53,15 @@ struct HeadingIndex {
 
         var entries: [Entry] = []
 
-        // Parse markdown for ATX headings (# style)
-        let lines = markdown.components(separatedBy: .newlines)
-        for line in lines {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            guard trimmed.hasPrefix("#") else { continue }
-
-            // Count heading level
-            var level = 0
-            for ch in trimmed {
-                if ch == "#" { level += 1 } else { break }
-            }
-            guard level >= 1, level <= 6 else { continue }
-
-            // Extract heading text (strip # and whitespace)
-            let headingText = String(trimmed.dropFirst(level)).trimmingCharacters(in: .whitespaces)
-            guard !headingText.isEmpty else { continue }
-
-            // Find this text in the attributed string
+        for heading in parseHeadings(from: markdown) {
             let searchRange = NSRange(location: 0, length: plainText.length)
-            let foundRange = plainText.range(of: headingText, options: [], range: searchRange)
+            let foundRange = plainText.range(of: heading.text, options: [], range: searchRange)
             guard foundRange.location != NSNotFound else { continue }
 
-            // Get the y-position
             let rects = textLayout.rects(for: foundRange)
             guard let rect = rects.first else { continue }
 
-            entries.append(Entry(level: level, text: headingText, yPosition: rect.origin.y))
+            entries.append(Entry(level: heading.level, text: heading.text, yPosition: rect.origin.y))
         }
 
         return HeadingIndex(entries: entries)

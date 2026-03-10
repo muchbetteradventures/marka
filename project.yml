@@ -50,6 +50,28 @@ targets:
         copyPhase:
           destination: plugins
 
+  MarkaTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests/MarkaTests
+      - path: Sources/Marka
+        excludes:
+          - main.swift
+          - AppDelegate.swift
+          - KeyboardScrollHandler.swift
+          - MarkdownWebView.swift
+          - ContentView.swift
+      - path: Sources/Shared
+    dependencies:
+      - package: MarkdownView
+        product: MarkdownView
+      - package: MarkdownView
+        product: MarkdownParser
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.marka.tests
+      GENERATE_INFOPLIST_FILE: YES
+
   MarkdownPreview:
     type: app-extension
     platform: macOS

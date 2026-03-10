@@ -4,10 +4,11 @@ import Foundation
 @MainActor
 final class RecentFiles {
     static let shared = RecentFiles()
+    private let defaults: UserDefaults
     private let key = "recentFiles"
-    private let maxCount = 10
+    let maxCount = 10
 
-    struct Entry: Codable {
+    struct Entry: Codable, Equatable {
         let path: String
         let title: String
         let baseURL: String?
@@ -15,8 +16,12 @@ final class RecentFiles {
         let bundlePath: String?
     }
 
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+    }
+
     var entries: [Entry] {
-        guard let data = UserDefaults.standard.data(forKey: key),
+        guard let data = defaults.data(forKey: key),
               let list = try? JSONDecoder().decode([Entry].self, from: data) else {
             return []
         }
@@ -51,12 +56,12 @@ final class RecentFiles {
     }
 
     func clear() {
-        UserDefaults.standard.removeObject(forKey: key)
+        defaults.removeObject(forKey: key)
     }
 
     private func save(_ list: [Entry]) {
         if let data = try? JSONEncoder().encode(list) {
-            UserDefaults.standard.set(data, forKey: key)
+            defaults.set(data, forKey: key)
         }
     }
 }
