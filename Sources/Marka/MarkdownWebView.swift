@@ -38,6 +38,7 @@ struct MarkdownNativeView: NSViewRepresentable {
         // Register so AppDelegate can find this coordinator
         AppDelegate.coordinatorRegistry[ObjectIdentifier(markdownTextView)] = context.coordinator
         context.coordinator.observeFrameChanges()
+        context.coordinator.observeAppearanceChanges()
 
         renderContent(markdownTextView: markdownTextView, scrollView: scrollView, coordinator: context.coordinator)
 
@@ -106,6 +107,8 @@ struct MarkdownNativeView: NSViewRepresentable {
         var narrowLayout: Bool = UserDefaults.standard.bool(forKey: "narrowLayout")
         var zoomLevel: CGFloat = 1.0
         var frameObserver: NSObjectProtocol?
+        var appearanceObservation: NSKeyValueObservation?
+        var lastIsDark: Bool?
 
         func applyZoom(to theme: MarkdownTheme) -> MarkdownTheme {
             guard zoomLevel != 1.0 else { return theme }
@@ -127,6 +130,50 @@ struct MarkdownNativeView: NSViewRepresentable {
                       let sv = self.scrollView else { return }
                 MarkdownNativeView.relayout(markdownTextView: mtv, scrollView: sv, coordinator: self)
             }
+        }
+
+        func observeAppearanceChanges() {
+            guard scrollView != nil, appearanceObservation == nil else { return }
+            appearanceObservation = nil // mark as set up
+            DistributedNotificationCenter.default().addObserver(
+                self,
+                selector: #selector(systemAppearanceDidChange),
+                name: NSNotification.Name("AppleInterfaceThemeChangedNotification"),
+                object: nil
+            )
+        }
+
+        @objc private func systemAppearanceDidChange(_ notification: Notification) {
+            self.perform(#selector(doCheckAppearanceChange), with: nil, afterDelay: 0.1)
+        }
+
+        @MainActor @objc private func doCheckAppearanceChange() {
+            guard let scrollView = self.scrollView,
+                  let markdownTextView = self.markdownTextView else { return }
+            let isDark = scrollView.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            guard isDark != self.lastIsDark else { return }
+            self.lastIsDark = isDark
+            self.rerenderForAppearance(markdownTextView: markdownTextView, scrollView: scrollView)
+        }
+
+        @MainActor
+        private func rerenderForAppearance(markdownTextView: MarkdownTextView, scrollView: NSScrollView) {
+            let isDark = scrollView.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            let theme = MarkdownGitHubTheme.theme(dark: isDark)
+            let scaledTheme = applyZoom(to: theme)
+
+            let parser = MarkdownParser()
+            let result = parser.parse(lastMarkdown)
+            let content = MarkdownTextView.PreprocessedContent(parserResult: result, theme: scaledTheme)
+            markdownTextView.theme = scaledTheme
+            markdownTextView.setMarkdownManually(content)
+
+            let bgColor = MarkdownGitHubTheme.backgroundColor(dark: isDark)
+            markdownTextView.wantsLayer = true
+            markdownTextView.layer?.backgroundColor = bgColor.cgColor
+            scrollView.backgroundColor = bgColor
+
+            MarkdownNativeView.relayout(markdownTextView: markdownTextView, scrollView: scrollView, coordinator: self)
         }
 
         deinit {

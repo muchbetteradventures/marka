@@ -1,27 +1,29 @@
 import AppKit
 
+/// Displays keyboard shortcuts as a floating panel attached to the parent window.
+/// Uses NSPanel instead of a subview to avoid NSHostingView layout issues.
 @MainActor
-final class HelpOverlay: NSView {
-    override init(frame: NSRect) {
-        super.init(frame: frame)
-        setupUI()
+enum HelpOverlay {
+    private static var panel: NSPanel?
+
+    static func toggle(in window: NSWindow) {
+        if panel != nil {
+            dismiss(from: window)
+        } else {
+            show(in: window)
+        }
     }
 
-    @available(*, unavailable)
-    required init?(coder: NSCoder) {
-        fatalError()
-    }
-
-    private func setupUI() {
-        wantsLayer = true
-        layer?.backgroundColor = NSColor.black.withAlphaComponent(0.85).cgColor
-        layer?.cornerRadius = 12
+    static func show(in window: NSWindow) {
+        guard panel == nil else { return }
 
         let shortcuts = [
             ("j / k", "Scroll down / up"),
             ("J / K", "Scroll half page down / up"),
             ("d / u", "Scroll half page down / up"),
             ("g / G", "Go to top / bottom"),
+            (", / .", "Previous / next heading"),
+            ("< / >", "Previous / next h1/h2"),
             ("\u{2318}F", "Find in page"),
             ("\u{2318}+ / \u{2318}-", "Zoom in / out"),
             ("\u{2318}0", "Actual size"),
@@ -33,96 +35,94 @@ final class HelpOverlay: NSView {
             ("Esc", "Close"),
         ]
 
+        let width: CGFloat = 320
+        let padding: CGFloat = 20
+        let rowHeight: CGFloat = 22
+        let rowSpacing: CGFloat = 4
+        let keyColWidth: CGFloat = 110
+        let titleHeight: CGFloat = 22
+
+        let totalHeight = padding + titleHeight + CGFloat(shortcuts.count) * (rowHeight + rowSpacing) + padding
+
+        let contentView = NSView(frame: NSRect(x: 0, y: 0, width: width, height: totalHeight))
+        contentView.wantsLayer = true
+        contentView.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.85).cgColor
+        contentView.layer?.cornerRadius = 12
+
+        // Title
         let title = NSTextField(labelWithString: "Keyboard Shortcuts")
         title.font = NSFont.boldSystemFont(ofSize: 16)
         title.textColor = .white
-        title.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(title)
+        title.isBezeled = false
+        title.drawsBackground = false
+        title.isEditable = false
+        title.isSelectable = false
+        title.sizeToFit()
+        title.frame.origin = NSPoint(
+            x: (width - title.frame.width) / 2,
+            y: totalHeight - padding - titleHeight
+        )
+        contentView.addSubview(title)
 
-        var lastView: NSView = title
+        // Rows (top to bottom, AppKit y goes up)
+        var y = title.frame.origin.y - rowSpacing - rowHeight
         for (key, desc) in shortcuts {
-            let row = makeRow(key: key, description: desc)
-            addSubview(row)
-            NSLayoutConstraint.activate([
-                row.topAnchor.constraint(equalTo: lastView.bottomAnchor, constant: 4),
-                row.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 24),
-                row.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -24),
-            ])
-            lastView = row
+            let keyLabel = NSTextField(labelWithString: key)
+            keyLabel.font = NSFont.monospacedSystemFont(ofSize: 13, weight: .medium)
+            keyLabel.textColor = NSColor(white: 0.9, alpha: 1)
+            keyLabel.isBezeled = false
+            keyLabel.drawsBackground = false
+            keyLabel.isEditable = false
+            keyLabel.isSelectable = false
+            keyLabel.frame = NSRect(x: padding, y: y, width: keyColWidth, height: rowHeight)
+
+            let descLabel = NSTextField(labelWithString: desc)
+            descLabel.font = NSFont.systemFont(ofSize: 13)
+            descLabel.textColor = NSColor(white: 0.7, alpha: 1)
+            descLabel.isBezeled = false
+            descLabel.drawsBackground = false
+            descLabel.isEditable = false
+            descLabel.isSelectable = false
+            descLabel.frame = NSRect(
+                x: padding + keyColWidth + 12,
+                y: y,
+                width: width - padding * 2 - keyColWidth - 12,
+                height: rowHeight
+            )
+
+            contentView.addSubview(keyLabel)
+            contentView.addSubview(descLabel)
+            y -= (rowHeight + rowSpacing)
         }
 
-        NSLayoutConstraint.activate([
-            title.topAnchor.constraint(equalTo: topAnchor, constant: 20),
-            title.centerXAnchor.constraint(equalTo: centerXAnchor),
-            lastView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -20),
-            widthAnchor.constraint(equalToConstant: 320),
-        ])
+        // Position centered over the parent window
+        let parentFrame = window.frame
+        let panelX = parentFrame.origin.x + (parentFrame.width - width) / 2
+        let panelY = parentFrame.origin.y + (parentFrame.height - totalHeight) / 2
+        let panelFrame = NSRect(x: panelX, y: panelY, width: width, height: totalHeight)
 
-        translatesAutoresizingMaskIntoConstraints = false
-    }
+        let p = NSPanel(
+            contentRect: panelFrame,
+            styleMask: [.nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        p.isOpaque = false
+        p.backgroundColor = .clear
+        p.hasShadow = true
+        p.level = .floating
+        p.contentView = contentView
+        p.isMovableByWindowBackground = false
 
-    private func makeRow(key: String, description: String) -> NSView {
-        let container = NSView()
-        container.translatesAutoresizingMaskIntoConstraints = false
-
-        let keyLabel = NSTextField(labelWithString: key)
-        keyLabel.font = NSFont.monospacedSystemFont(ofSize: 13, weight: .medium)
-        keyLabel.textColor = NSColor(white: 0.9, alpha: 1)
-        keyLabel.translatesAutoresizingMaskIntoConstraints = false
-
-        let descLabel = NSTextField(labelWithString: description)
-        descLabel.font = NSFont.systemFont(ofSize: 13)
-        descLabel.textColor = NSColor(white: 0.7, alpha: 1)
-        descLabel.translatesAutoresizingMaskIntoConstraints = false
-
-        container.addSubview(keyLabel)
-        container.addSubview(descLabel)
-
-        NSLayoutConstraint.activate([
-            keyLabel.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            keyLabel.centerYAnchor.constraint(equalTo: container.centerYAnchor),
-            keyLabel.widthAnchor.constraint(equalToConstant: 110),
-
-            descLabel.leadingAnchor.constraint(equalTo: keyLabel.trailingAnchor, constant: 12),
-            descLabel.centerYAnchor.constraint(equalTo: container.centerYAnchor),
-            descLabel.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor),
-
-            container.heightAnchor.constraint(equalToConstant: 22),
-        ])
-
-        return container
-    }
-
-    override func mouseDown(with event: NSEvent) {
-        Self.dismiss(from: window)
-    }
-
-    static func toggle(in window: NSWindow) {
-        if findExisting(in: window) != nil {
-            dismiss(from: window)
-        } else {
-            show(in: window)
-        }
-    }
-
-    static func show(in window: NSWindow) {
-        guard let contentView = window.contentView else { return }
-        if findExisting(in: window) != nil { return }
-
-        let overlay = HelpOverlay()
-        contentView.addSubview(overlay)
-
-        NSLayoutConstraint.activate([
-            overlay.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-            overlay.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
-        ])
+        window.addChildWindow(p, ordered: .above)
+        p.orderFront(nil)
+        panel = p
     }
 
     static func dismiss(from window: NSWindow?) {
-        findExisting(in: window)?.removeFromSuperview()
-    }
-
-    private static func findExisting(in window: NSWindow?) -> HelpOverlay? {
-        window?.contentView?.subviews.first(where: { $0 is HelpOverlay }) as? HelpOverlay
+        guard let p = panel else { return }
+        window?.removeChildWindow(p)
+        p.orderOut(nil)
+        panel = nil
     }
 }

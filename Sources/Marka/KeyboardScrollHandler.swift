@@ -1,4 +1,5 @@
 import AppKit
+import MarkdownParser
 import MarkdownView
 
 /// Monitors key events for vim-style scrolling and help overlay.
@@ -7,6 +8,8 @@ import MarkdownView
 final class KeyboardScrollHandler {
     static let shared = KeyboardScrollHandler()
     private var monitor: Any?
+    private var headingIndex: HeadingIndex?
+    private var headingIndexMarkdown: String?
 
     func install() {
         guard monitor == nil else { return }
@@ -58,6 +61,18 @@ final class KeyboardScrollHandler {
             return true
         case "G":
             scrollToBottom(clipView, scrollView: scrollView)
+            return true
+        case ",":
+            navigateHeading(scrollView: scrollView, direction: .previous, majorOnly: false)
+            return true
+        case ".":
+            navigateHeading(scrollView: scrollView, direction: .next, majorOnly: false)
+            return true
+        case "<":
+            navigateHeading(scrollView: scrollView, direction: .previous, majorOnly: true)
+            return true
+        case ">":
+            navigateHeading(scrollView: scrollView, direction: .next, majorOnly: true)
             return true
         case "?":
             toggleHelp()
@@ -113,6 +128,41 @@ final class KeyboardScrollHandler {
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.2
             clipView.animator().setBoundsOrigin(NSPoint(x: 0, y: maxY))
+        }
+    }
+
+    private enum HeadingDirection { case next, previous }
+
+    private func navigateHeading(scrollView: NSScrollView, direction: HeadingDirection, majorOnly: Bool) {
+        guard let markdownTextView = scrollView.documentView as? MarkdownTextView else { return }
+
+        // Rebuild heading index if content changed
+        let id = ObjectIdentifier(markdownTextView)
+        if let coordinator = AppDelegate.coordinatorRegistry[id] {
+            if headingIndexMarkdown != coordinator.lastMarkdown {
+                headingIndex = HeadingIndex.build(from: markdownTextView, markdown: coordinator.lastMarkdown)
+                headingIndexMarkdown = coordinator.lastMarkdown
+            }
+        }
+
+        guard let index = headingIndex else { return }
+        let clipView = scrollView.contentView
+        let scrollY = clipView.bounds.origin.y
+
+        let entry: HeadingIndex.Entry?
+        switch direction {
+        case .next:
+            entry = index.nextHeading(after: scrollY, majorOnly: majorOnly)
+        case .previous:
+            entry = index.previousHeading(before: scrollY, majorOnly: majorOnly)
+        }
+
+        guard let target = entry else { return }
+        let targetY = max(0, target.yPosition - 10)
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.2
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            clipView.animator().setBoundsOrigin(NSPoint(x: 0, y: targetY))
         }
     }
 
