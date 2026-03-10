@@ -9,6 +9,8 @@ final class MenuBarBuilder: NSObject, NSMenuItemValidation {
     private let actualSize: () -> Void
     private let toggleNarrowLayout: () -> Void
     private let openDocument: (IPCPayload) -> Void
+    private let showOpenDialog: () -> Void
+    private var recentMenu: NSMenu!
 
     init(
         showFind: @escaping () -> Void,
@@ -17,7 +19,8 @@ final class MenuBarBuilder: NSObject, NSMenuItemValidation {
         zoomOut: @escaping () -> Void,
         actualSize: @escaping () -> Void,
         toggleNarrowLayout: @escaping () -> Void,
-        openDocument: @escaping (IPCPayload) -> Void
+        openDocument: @escaping (IPCPayload) -> Void,
+        showOpenDialog: @escaping () -> Void
     ) {
         self.showFind = showFind
         self.copyRichText = copyRichText
@@ -26,6 +29,7 @@ final class MenuBarBuilder: NSObject, NSMenuItemValidation {
         self.actualSize = actualSize
         self.toggleNarrowLayout = toggleNarrowLayout
         self.openDocument = openDocument
+        self.showOpenDialog = showOpenDialog
         super.init()
     }
 
@@ -44,6 +48,15 @@ final class MenuBarBuilder: NSObject, NSMenuItemValidation {
         // File menu
         let fileMenuItem = NSMenuItem()
         let fileMenu = NSMenu(title: "File")
+        let openItem = NSMenuItem(title: "Open\u{2026}", action: #selector(doOpenFile), keyEquivalent: "o")
+        openItem.target = self
+        fileMenu.addItem(openItem)
+        let recentMenuItem = NSMenuItem(title: "Open Recent", action: nil, keyEquivalent: "")
+        recentMenu = NSMenu(title: "Open Recent")
+        recentMenu.delegate = self
+        recentMenuItem.submenu = recentMenu
+        fileMenu.addItem(recentMenuItem)
+        fileMenu.addItem(.separator())
         let previewClipboardItem = NSMenuItem(title: "Preview Clipboard", action: #selector(previewClipboard), keyEquivalent: "V")
         previewClipboardItem.keyEquivalentModifierMask = [.command, .shift]
         previewClipboardItem.target = self
@@ -105,6 +118,7 @@ final class MenuBarBuilder: NSObject, NSMenuItemValidation {
 
     // MARK: - Actions
 
+    @objc private func doOpenFile() { showOpenDialog() }
     @objc private func doShowFind() { showFind() }
     @objc private func doCopyRichText() { copyRichText() }
     @objc private func doZoomIn() { zoomIn() }
@@ -151,5 +165,68 @@ final class MenuBarBuilder: NSObject, NSMenuItemValidation {
             return true
         }
         return true
+    }
+
+    @objc private func openRecentFile(_ sender: NSMenuItem) {
+        let entries = RecentFiles.shared.entries
+        guard sender.tag >= 0, sender.tag < entries.count else { return }
+        let entry = entries[sender.tag]
+        let path = entry.path
+        if TextBundleHandler.isTextBundle(path: path) {
+            guard let bundle = try? TextBundleHandler.load(path: path) else { return }
+            let payload = IPCPayload(
+                path: bundle.markdownFilePath,
+                isTemp: bundle.isTextPack,
+                title: bundle.title,
+                baseURL: (bundle.assetsPath ?? URL(fileURLWithPath: bundle.markdownFilePath).deletingLastPathComponent()).absoluteString,
+                isTextBundle: true,
+                bundlePath: bundle.bundlePath,
+                extractedPath: bundle.extractedPath
+            )
+            openDocument(payload)
+        } else {
+            let url = URL(fileURLWithPath: path)
+            let payload = IPCPayload(
+                path: path,
+                isTemp: false,
+                title: url.lastPathComponent,
+                baseURL: url.deletingLastPathComponent().absoluteString,
+                isTextBundle: false,
+                bundlePath: nil,
+                extractedPath: nil
+            )
+            openDocument(payload)
+        }
+    }
+
+    @objc private func clearRecentFiles() {
+        RecentFiles.shared.clear()
+    }
+}
+
+extension MenuBarBuilder: NSMenuDelegate {
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        guard menu === recentMenu else { return }
+        menu.removeAllItems()
+
+        let entries = RecentFiles.shared.entries
+        if entries.isEmpty {
+            let emptyItem = NSMenuItem(title: "No Recent Files", action: nil, keyEquivalent: "")
+            emptyItem.isEnabled = false
+            menu.addItem(emptyItem)
+            return
+        }
+
+        for (index, entry) in entries.enumerated() {
+            let item = NSMenuItem(title: entry.title, action: #selector(openRecentFile(_:)), keyEquivalent: "")
+            item.target = self
+            item.tag = index
+            menu.addItem(item)
+        }
+
+        menu.addItem(.separator())
+        let clearItem = NSMenuItem(title: "Clear Recent", action: #selector(clearRecentFiles), keyEquivalent: "")
+        clearItem.target = self
+        menu.addItem(clearItem)
     }
 }

@@ -26,6 +26,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             toggleNarrowLayout: { [weak self] in self?.toggleNarrowLayout() },
             openDocument: { [weak self] payload in
                 self?.openDocument(payload: payload)
+            },
+            showOpenDialog: { [weak self] in
+                self?.showOpenDialog()
             }
         )
         let menus = menuBarBuilder.buildMenuBar()
@@ -50,6 +53,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     func openDocument(payload: IPCPayload) {
+        // Track in recent files (skip temp files like clipboard previews)
+        if !payload.isTemp {
+            RecentFiles.shared.add(payload)
+        }
+
         let document = MarkdownDocument()
         let url = URL(fileURLWithPath: payload.path)
 
@@ -106,14 +114,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func showOpenDialog() {
         let panel = NSOpenPanel()
         panel.title = "Open Markdown File"
-        panel.allowedContentTypes = [
+        var contentTypes: [UTType] = [
             .init(filenameExtension: "md")!,
             .init(filenameExtension: "markdown")!,
-            .init(filenameExtension: "textbundle")!,
             .init(filenameExtension: "textpack")!,
         ]
+        if let textBundleType = UTType("org.textbundle.package") {
+            contentTypes.append(textBundleType)
+        }
+        panel.allowedContentTypes = contentTypes
         panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = true
+        panel.canChooseDirectories = false
+        panel.treatsFilePackagesAsDirectories = false
 
         guard panel.runModal() == .OK, let url = panel.url else {
             if windowInfos.isEmpty {
@@ -179,7 +191,53 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        true
+        false
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag {
+            showOpenDialog()
+        }
+        return true
+    }
+
+    func application(_ sender: NSApplication, openFile filename: String) -> Bool {
+        openFromPath(filename)
+        return true
+    }
+
+    func application(_ sender: NSApplication, openFiles filenames: [String]) {
+        for filename in filenames {
+            openFromPath(filename)
+        }
+    }
+
+    private func openFromPath(_ path: String) {
+        if TextBundleHandler.isTextBundle(path: path) {
+            guard let bundle = try? TextBundleHandler.load(path: path) else { return }
+            let payload = IPCPayload(
+                path: bundle.markdownFilePath,
+                isTemp: bundle.isTextPack,
+                title: bundle.title,
+                baseURL: (bundle.assetsPath ?? URL(fileURLWithPath: bundle.markdownFilePath).deletingLastPathComponent()).absoluteString,
+                isTextBundle: true,
+                bundlePath: bundle.bundlePath,
+                extractedPath: bundle.extractedPath
+            )
+            openDocument(payload: payload)
+        } else {
+            let url = URL(fileURLWithPath: path)
+            let payload = IPCPayload(
+                path: path,
+                isTemp: false,
+                title: url.lastPathComponent,
+                baseURL: url.deletingLastPathComponent().absoluteString,
+                isTextBundle: false,
+                bundlePath: nil,
+                extractedPath: nil
+            )
+            openDocument(payload: payload)
+        }
     }
 
     // MARK: - Native actions
@@ -267,6 +325,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let parser = MarkdownParser()
         let result = parser.parse(coordinator.lastMarkdown)
         let content = MarkdownTextView.PreprocessedContent(parserResult: result, theme: scaledTheme)
+        content.loadedImages = ImageLoader.loadImages(from: coordinator.lastMarkdown, baseURL: coordinator.baseURL)
+        let scrollWidth = scrollView.contentView.bounds.width
+        var cw = scrollWidth - (coordinator.padding * 2)
+        if coordinator.narrowLayout { cw = min(cw, 980) }
+        content.contentWidth = cw
         markdownTextView.theme = scaledTheme
         markdownTextView.setMarkdownManually(content)
         MarkdownNativeView.relayout(markdownTextView: markdownTextView, scrollView: scrollView, coordinator: coordinator)

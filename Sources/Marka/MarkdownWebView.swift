@@ -54,6 +54,7 @@ struct MarkdownNativeView: NSViewRepresentable {
 
     private func renderContent(markdownTextView: MarkdownTextView, scrollView: NSScrollView, coordinator: Coordinator) {
         coordinator.lastMarkdown = document.markdown
+        coordinator.baseURL = document.baseURL
 
         let isDark = scrollView.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
         let theme = MarkdownGitHubTheme.theme(dark: isDark)
@@ -62,6 +63,14 @@ struct MarkdownNativeView: NSViewRepresentable {
         let parser = MarkdownParser()
         let result = parser.parse(document.markdown)
         let content = MarkdownTextView.PreprocessedContent(parserResult: result, theme: scaledTheme)
+        content.loadedImages = ImageLoader.loadImages(from: document.markdown, baseURL: document.baseURL)
+
+        let scrollWidth = scrollView.contentView.bounds.width
+        var contentWidth = scrollWidth - (coordinator.padding * 2)
+        if coordinator.narrowLayout {
+            contentWidth = min(contentWidth, 980)
+        }
+        content.contentWidth = contentWidth
 
         markdownTextView.theme = scaledTheme
         markdownTextView.setMarkdownManually(content)
@@ -103,6 +112,7 @@ struct MarkdownNativeView: NSViewRepresentable {
         var markdownTextView: MarkdownTextView?
         var scrollView: NSScrollView?
         var lastMarkdown: String = ""
+        var baseURL: URL?
         let padding: CGFloat = 32.0
         var narrowLayout: Bool = UserDefaults.standard.bool(forKey: "narrowLayout")
         var zoomLevel: CGFloat = 1.0
@@ -165,6 +175,11 @@ struct MarkdownNativeView: NSViewRepresentable {
             let parser = MarkdownParser()
             let result = parser.parse(lastMarkdown)
             let content = MarkdownTextView.PreprocessedContent(parserResult: result, theme: scaledTheme)
+            content.loadedImages = ImageLoader.loadImages(from: lastMarkdown, baseURL: baseURL)
+            let scrollWidth = scrollView.contentView.bounds.width
+            var cw = scrollWidth - (padding * 2)
+            if narrowLayout { cw = min(cw, 980) }
+            content.contentWidth = cw
             markdownTextView.theme = scaledTheme
             markdownTextView.setMarkdownManually(content)
 
