@@ -39,7 +39,7 @@ final class RecentFiles {
 
         // Add to front
         let entry = Entry(
-            path: payload.bundlePath ?? payload.path,
+            path: identifier,
             title: payload.title,
             baseURL: payload.baseURL,
             isTextBundle: payload.isTextBundle,
