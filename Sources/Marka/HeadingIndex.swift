@@ -52,11 +52,13 @@ struct HeadingIndex {
         let plainText = attrStr.string as NSString
 
         var entries: [Entry] = []
+        var searchStart = 0
 
         for heading in parseHeadings(from: markdown) {
-            let searchRange = NSRange(location: 0, length: plainText.length)
+            let searchRange = NSRange(location: searchStart, length: plainText.length - searchStart)
             let foundRange = plainText.range(of: heading.text, options: [], range: searchRange)
             guard foundRange.location != NSNotFound else { continue }
+            searchStart = foundRange.location + foundRange.length
 
             let rects = textLayout.rects(for: foundRange)
             guard let rect = rects.first else { continue }
