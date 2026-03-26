@@ -174,7 +174,7 @@ gh release create "v${VERSION}" "${DMG_NAME}" "${TAR_NAME}" \
 
 # --- Update Homebrew tap ---
 
-TAP_REPO="${SCRIPT_DIR}/../homebrew-tap"
+TAP_REPO="${HOME}/Experimental/homebrew-tap"
 CASK="${TAP_REPO}/Casks/marka.rb"
 
 if [[ -f "${CASK}" ]]; then
