@@ -63,6 +63,11 @@ rm -rf "${INSTALL_PATH}"
 echo "==> Generating Xcode project..."
 xcodegen generate
 
+# --- Clean DerivedData to ensure MARKA_DEBUG compilation flag takes effect ---
+
+echo "==> Cleaning DerivedData..."
+rm -rf .build/DerivedData
+
 # --- Build (with MARKA_DEBUG) ---
 
 echo "==> Building release (debug overlay enabled)..."

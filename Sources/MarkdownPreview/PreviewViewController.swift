@@ -33,6 +33,7 @@ class PreviewViewController: NSViewController, @preconcurrency QLPreviewingContr
     override func viewDidLayout() {
         super.viewDidLayout()
         relayoutMarkdown()
+        repositionInfoOverlay()
     }
 
     private func relayoutMarkdown() {
@@ -115,13 +116,25 @@ class PreviewViewController: NSViewController, @preconcurrency QLPreviewingContr
         guard !fields.isEmpty else { return }
 
         let hosting = NSHostingView(rootView: QLInfoButton(fields: fields))
-        hosting.translatesAutoresizingMaskIntoConstraints = false
+        // Use frame-based layout to avoid mixing constraint systems with the
+        // scroll view's autoresizingMask layout, which caused scroll-to-top issues.
+        hosting.autoresizingMask = [.minXMargin, .minYMargin]
         view.addSubview(hosting)
-        NSLayoutConstraint.activate([
-            hosting.topAnchor.constraint(equalTo: view.topAnchor, constant: 10),
-            hosting.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -10),
-        ])
         infoOverlay = hosting
+        repositionInfoOverlay()
+    }
+
+    private func repositionInfoOverlay() {
+        guard let overlay = infoOverlay else { return }
+        let size: CGFloat = 44
+        let margin: CGFloat = 10
+        // AppKit uses bottom-left origin, so top-right = (maxX - size, maxY - size)
+        overlay.frame = NSRect(
+            x: view.bounds.width - size - margin,
+            y: view.bounds.height - size - margin,
+            width: size,
+            height: size
+        )
     }
 }
 
