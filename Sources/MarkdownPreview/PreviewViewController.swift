@@ -3,11 +3,13 @@ import Compression
 import MarkdownParser
 import MarkdownView
 import Quartz
+import SwiftUI
 
 class PreviewViewController: NSViewController, @preconcurrency QLPreviewingController {
 
     private var markdownTextView: MarkdownTextView!
     private var scrollView: NSScrollView!
+    private var infoOverlay: NSView?
 
     private let padding: CGFloat = 32.0
 
@@ -70,7 +72,9 @@ class PreviewViewController: NSViewController, @preconcurrency QLPreviewingContr
                 return
             }
 
-            let body = FrontmatterParser.body(from: rawMarkdown)
+            let parsed = FrontmatterParser.parse(rawMarkdown)
+            let body = parsed.body
+            let fields = parsed.fields
 
             let isDark = view.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
             let theme = MarkdownGitHubTheme.theme(dark: isDark)
@@ -90,12 +94,50 @@ class PreviewViewController: NSViewController, @preconcurrency QLPreviewingContr
             scrollView.backgroundColor = bgColor
             scrollView.drawsBackground = true
 
+            updateInfoOverlay(fields: fields)
+
             handler(nil)
         } catch {
             handler(error)
         }
     }
 
+    // MARK: - Info overlay
+
+    private func updateInfoOverlay(fields: [(key: String, value: String)]) {
+        infoOverlay?.removeFromSuperview()
+        infoOverlay = nil
+        guard !fields.isEmpty else { return }
+
+        let hosting = NSHostingView(rootView: QLInfoButton(fields: fields))
+        hosting.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.addSubview(hosting)
+        NSLayoutConstraint.activate([
+            hosting.topAnchor.constraint(equalTo: scrollView.topAnchor, constant: 10),
+            hosting.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor, constant: -10),
+        ])
+        infoOverlay = hosting
+    }
+}
+
+private struct QLInfoButton: View {
+    let fields: [(key: String, value: String)]
+    @State private var showingInfo = false
+
+    var body: some View {
+        Button {
+            showingInfo.toggle()
+        } label: {
+            Image(systemName: "info.circle.fill")
+                .font(.system(size: 22))
+                .foregroundStyle(.white)
+                .shadow(color: .black.opacity(0.35), radius: 3, x: 0, y: 1)
+        }
+        .buttonStyle(.plain)
+        .popover(isPresented: $showingInfo) {
+            FrontmatterInfoView(fields: fields)
+        }
+    }
 }
 
 /// Minimal ZIP-based TextPack reader for sandboxed environments.

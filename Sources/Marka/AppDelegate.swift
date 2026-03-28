@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private let ipcServer = IPCServer()
     private let initialDocument: IPCPayload?
     private var menuBarBuilder: MenuBarBuilder!
+    private var fileWasOpenedViaDelegate = false
 
     init(initialDocument: IPCPayload? = nil) {
         self.initialDocument = initialDocument
@@ -44,7 +45,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if let initialDocument {
             openDocument(payload: initialDocument)
         } else {
-            showOpenDialog()
+            // Defer so that application(_:openFile:) can fire first (e.g. double-click in Finder).
+            // If a file was already handled by the time this runs, skip the dialog.
+            DispatchQueue.main.async { [weak self] in
+                guard let self, !self.fileWasOpenedViaDelegate else { return }
+                self.showOpenDialog()
+            }
         }
 
         KeyboardScrollHandler.shared.install()
@@ -127,12 +133,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         panel.canChooseDirectories = false
         panel.treatsFilePackagesAsDirectories = false
 
-        guard panel.runModal() == .OK, let url = panel.url else {
-            if windowInfos.isEmpty {
-                NSApp.terminate(nil)
-            }
-            return
-        }
+        guard panel.runModal() == .OK, let url = panel.url else { return }
 
         let path = url.path
 
@@ -202,11 +203,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     func application(_ sender: NSApplication, openFile filename: String) -> Bool {
+        fileWasOpenedViaDelegate = true
         openFromPath(filename)
         return true
     }
 
     func application(_ sender: NSApplication, openFiles filenames: [String]) {
+        fileWasOpenedViaDelegate = true
         for filename in filenames {
             openFromPath(filename)
         }
