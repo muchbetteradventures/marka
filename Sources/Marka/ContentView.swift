@@ -12,17 +12,17 @@ struct ContentView: View {
         return MarkdownNativeView(document: document)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .overlay(alignment: .bottomLeading) {
-                #if MARKA_DEBUG
-                Text("v\(markaVersion) #\(markaBuildNumber)")
-                    .font(.system(size: 11, weight: .medium, design: .monospaced))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(.black.opacity(0.55))
-                    .foregroundStyle(.white)
-                    .clipShape(Capsule())
-                    .padding(10)
-                    .allowsHitTesting(false)
-                #endif
+                if markaIsDebugBuild {
+                    Text("v\(markaVersion) #\(markaBuildNumber)")
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(.black.opacity(0.55))
+                        .foregroundStyle(.white)
+                        .clipShape(Capsule())
+                        .padding(10)
+                        .allowsHitTesting(false)
+                }
             }
             .toolbar {
                 if !fields.isEmpty {

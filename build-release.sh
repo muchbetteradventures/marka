@@ -65,6 +65,7 @@ echo "==> Build number: ${BUILD_NUMBER}"
 # Update Version.swift (version + build number)
 sed -i '' "s/let markaVersion = \".*\"/let markaVersion = \"${VERSION}\"/" Sources/Marka/Version.swift
 sed -i '' "s/let markaBuildNumber = [0-9]*/let markaBuildNumber = ${BUILD_NUMBER}/" Sources/Marka/Version.swift
+sed -i '' "s/let markaIsDebugBuild = .*/let markaIsDebugBuild = false/" Sources/Marka/Version.swift
 
 # Update Info.plists
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${VERSION}" Marka-Info.plist

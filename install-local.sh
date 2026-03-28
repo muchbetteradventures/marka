@@ -40,10 +40,12 @@ echo "==> Build number: ${BUILD_NUMBER}"
 
 sed -i '' "s/let markaBuildNumber = [0-9]*/let markaBuildNumber = ${BUILD_NUMBER}/" \
     Sources/Marka/Version.swift
+sed -i '' "s/let markaIsDebugBuild = .*/let markaIsDebugBuild = true/" \
+    Sources/Marka/Version.swift
 
 # --- Clean up existing installs ---
 
-echo "==> Removing stale QL extension registrations..."
+echo "==> Removing ALL stale QL extension registrations (including Xcode Debug builds)..."
 while IFS= read -r line; do
     path=$(echo "$line" | awk '{print $NF}')
     if [[ -n "$path" ]]; then
@@ -63,19 +65,18 @@ rm -rf "${INSTALL_PATH}"
 echo "==> Generating Xcode project..."
 xcodegen generate
 
-# --- Clean DerivedData to ensure MARKA_DEBUG compilation flag takes effect ---
+# --- Clean DerivedData ---
 
 echo "==> Cleaning DerivedData..."
 rm -rf .build/DerivedData
 
-# --- Build (with MARKA_DEBUG) ---
+# --- Build ---
 
 echo "==> Building release (debug overlay enabled)..."
 xcodebuild -project Marka.xcodeproj \
     -scheme Marka \
     -configuration Release \
     -derivedDataPath .build/DerivedData \
-    SWIFT_ACTIVE_COMPILATION_CONDITIONS="MARKA_DEBUG" \
     build 2>&1 | grep -E "error:|BUILD SUCCEEDED|BUILD FAILED"
 
 if [[ ! -d "${APP_PATH}" ]]; then
@@ -126,6 +127,16 @@ cp -R "${APP_PATH}" "${INSTALL_PATH}"
 
 echo "==> Registering QL extension..."
 pluginkit -a "${INSTALL_PATH}/Contents/PlugIns/MarkdownPreview.appex"
+
+# Remove any Xcode DerivedData registrations that may have snuck back in
+echo "==> Removing any remaining DerivedData registrations..."
+while IFS= read -r line; do
+    path=$(echo "$line" | awk '{print $NF}')
+    if [[ "$path" == *"DerivedData"* ]]; then
+        echo "  Removing DerivedData entry: $path"
+        pluginkit -r "$path" 2>/dev/null || true
+    fi
+done < <(pluginkit -m -p com.apple.quicklook.preview -A -v 2>/dev/null | grep "$QL_BUNDLE" || true)
 
 echo "==> Registered extensions:"
 pluginkit -m -p com.apple.quicklook.preview -A -v 2>/dev/null | grep "$QL_BUNDLE" || echo "  (none found)"

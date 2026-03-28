@@ -81,10 +81,10 @@ struct MarkdownNativeView: NSViewRepresentable {
         markdownTextView.layer?.backgroundColor = bgColor.cgColor
         scrollView.backgroundColor = bgColor
 
-        Self.relayout(markdownTextView: markdownTextView, scrollView: scrollView, coordinator: coordinator)
+        Self.relayout(markdownTextView: markdownTextView, scrollView: scrollView, coordinator: coordinator, scrollToTop: true)
     }
 
-    static func relayout(markdownTextView: MarkdownTextView, scrollView: NSScrollView, coordinator: Coordinator) {
+    static func relayout(markdownTextView: MarkdownTextView, scrollView: NSScrollView, coordinator: Coordinator, scrollToTop: Bool = false) {
         let padding = coordinator.padding
         let scrollWidth = scrollView.contentView.bounds.width
         guard scrollWidth > 0 else { return }
@@ -106,6 +106,13 @@ struct MarkdownNativeView: NSViewRepresentable {
         } else {
             scrollView.contentInsets = NSEdgeInsets(top: padding, left: padding, bottom: padding, right: padding)
             scrollView.scrollerInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: -padding)
+        }
+
+        if scrollToTop {
+            // MarkdownTextView is flipped (y=0 at top). Scroll to y=-padding so the
+            // top content inset is visible — without this the document starts flush
+            // against the window edge after a content change.
+            scrollView.documentView?.scroll(NSPoint(x: 0, y: -padding))
         }
     }
 

@@ -11,6 +11,7 @@ struct ParsedArguments {
     let isTextBundle: Bool
     let bundlePath: String?           // Original bundle path (for display)
     let extractedPath: String?        // For textpack: temp extraction directory to clean up
+    var qlPreview: Bool = false       // Open in QL Preview window instead of main window
 }
 
 enum LaunchAction {
@@ -40,6 +41,9 @@ enum ArgumentParser {
             }
             filteredArgs.remove(at: tempIdx)
         }
+
+        let qlPreviewMode = filteredArgs.contains("--ql-preview")
+        filteredArgs.removeAll { $0 == "--ql-preview" }
 
         if filteredArgs.count > 1 {
             let rawPath = filteredArgs[1]
@@ -79,7 +83,8 @@ enum ArgumentParser {
                         tempFileToClean: tempFileToClean,
                         isTextBundle: true,
                         bundlePath: bundle.bundlePath,
-                        extractedPath: bundle.extractedPath
+                        extractedPath: bundle.extractedPath,
+                        qlPreview: qlPreviewMode
                     ))
                 } catch {
                     fputs("Error: \(error.localizedDescription)\n", stderr)
@@ -101,7 +106,8 @@ enum ArgumentParser {
                 tempFileToClean: tempFileToClean,
                 isTextBundle: false,
                 bundlePath: nil,
-                extractedPath: nil
+                extractedPath: nil,
+                qlPreview: qlPreviewMode
             ))
 
         } else if let content = StdinReader.readAll() {

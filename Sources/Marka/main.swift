@@ -27,12 +27,12 @@ case .launchApp:
 case .run(let args):
     // --- IPC: try handing off to running instance ---
 
-    if !args.isChildProcess {
+    if !args.isChildProcess && !args.qlPreview {
         let payload = IPCPayload(
             path: args.filePath,
             isTemp: args.isTemp,
             title: args.title,
-            baseURL: args.baseURL?.absoluteString,
+            baseURL: URL(fileURLWithPath: args.filePath).deletingLastPathComponent().absoluteString,
             isTextBundle: args.isTextBundle,
             bundlePath: args.bundlePath,
             extractedPath: args.extractedPath
@@ -55,6 +55,9 @@ case .run(let args):
         if args.isTemp {
             childArgs.append("--marka-temp")
             childArgs.append(args.filePath)
+        }
+        if args.qlPreview {
+            childArgs.append("--ql-preview")
         }
 
         var pid: pid_t = 0
@@ -98,7 +101,7 @@ case .run(let args):
         extractedPath: args.extractedPath
     )
 
-    let delegate = AppDelegate(initialDocument: initialPayload)
+    let delegate = AppDelegate(initialDocument: initialPayload, openAsQLPreview: args.qlPreview)
     app.delegate = delegate
 
     // Clean temp file when app terminates

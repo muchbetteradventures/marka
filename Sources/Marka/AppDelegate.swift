@@ -9,11 +9,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var windowInfos: [(window: NSWindow, document: MarkdownDocument, watcher: FileWatcher?, tempPath: String?, extractedPath: String?)] = []
     private let ipcServer = IPCServer()
     private let initialDocument: IPCPayload?
+    private let openAsQLPreview: Bool
     private var menuBarBuilder: MenuBarBuilder!
     private var fileWasOpenedViaDelegate = false
 
-    init(initialDocument: IPCPayload? = nil) {
+    init(initialDocument: IPCPayload? = nil, openAsQLPreview: Bool = false) {
         self.initialDocument = initialDocument
+        self.openAsQLPreview = openAsQLPreview
         super.init()
     }
 
@@ -43,7 +45,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         ipcServer.start()
 
         if let initialDocument {
-            openDocument(payload: initialDocument)
+            if openAsQLPreview {
+                let url = URL(fileURLWithPath: initialDocument.path)
+                if let markdown = try? String(contentsOf: url, encoding: .utf8) {
+                    let baseURL = initialDocument.baseURL.flatMap { URL(string: $0) ?? URL(fileURLWithPath: $0) }
+                    QLPreviewWindow.show(markdown: markdown, title: initialDocument.title, baseURL: baseURL)
+                }
+            } else {
+                openDocument(payload: initialDocument)
+            }
         } else {
             // Defer so that application(_:openFile:) can fire first (e.g. double-click in Finder).
             // If a file was already handled by the time this runs, skip the dialog.
@@ -72,7 +82,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         document.title = payload.title
         if let base = payload.baseURL {
-            document.baseURL = URL(string: base)
+            // URL(string:) can silently return nil for file URLs with unencoded characters.
+            // Fall back to URL(fileURLWithPath:) for any string that looks like a path.
+            document.baseURL = URL(string: base) ?? URL(fileURLWithPath: base)
         }
 
         let contentView = ContentView(document: document)
@@ -204,12 +216,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func application(_ sender: NSApplication, openFile filename: String) -> Bool {
         fileWasOpenedViaDelegate = true
+        // Skip if we were launched with a file argument (already opened via initialDocument)
+        // or if we're in QL preview mode. Either way, opening a second window is wrong.
+        guard initialDocument == nil, !openAsQLPreview else { return true }
         openFromPath(filename)
         return true
     }
 
     func application(_ sender: NSApplication, openFiles filenames: [String]) {
         fileWasOpenedViaDelegate = true
+        guard initialDocument == nil, !openAsQLPreview else { return }
         for filename in filenames {
             openFromPath(filename)
         }

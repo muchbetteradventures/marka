@@ -10,19 +10,27 @@ class PreviewViewController: NSViewController, @preconcurrency QLPreviewingContr
     private var markdownTextView: MarkdownTextView!
     private var scrollView: NSScrollView!
     private var infoOverlay: NSView?
+    private var didScrollToTop = false
 
     private let padding: CGFloat = 32.0
 
     override func loadView() {
-        scrollView = NSScrollView(frame: NSRect(x: 0, y: 0, width: 600, height: 800))
+        // Use a plain container so the floating overlay can sit alongside the
+        // scroll view without being a child of it (avoids NSScrollView layer
+        // interference and the white-corner artifact).
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: 600, height: 800))
+        container.autoresizingMask = [.width, .height]
+
+        scrollView = NSScrollView(frame: container.bounds)
         scrollView.hasVerticalScroller = true
         scrollView.autoresizingMask = [.width, .height]
 
         markdownTextView = MarkdownTextView()
-
         scrollView.documentView = markdownTextView
         scrollView.contentView.postsBoundsChangedNotifications = true
-        self.view = scrollView
+        container.addSubview(scrollView)
+
+        self.view = container
     }
 
     override func viewDidLayout() {
@@ -46,9 +54,17 @@ class PreviewViewController: NSViewController, @preconcurrency QLPreviewingContr
         scrollView.automaticallyAdjustsContentInsets = false
         scrollView.contentInsets = NSEdgeInsets(top: padding, left: padding, bottom: padding, right: padding)
         scrollView.scrollerInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: -padding)
+
+        if !didScrollToTop {
+            // MarkdownTextView is flipped (y=0 at top). Scroll to y=-padding so the
+            // top content inset is visible rather than the document starting flush.
+            scrollView.documentView?.scroll(NSPoint(x: 0, y: -padding))
+            didScrollToTop = true
+        }
     }
 
     func preparePreviewOfFile(at url: URL, completionHandler handler: @escaping (Error?) -> Void) {
+        didScrollToTop = false
         do {
             let rawMarkdown: String
             var baseURL: URL?
@@ -111,27 +127,32 @@ class PreviewViewController: NSViewController, @preconcurrency QLPreviewingContr
         guard !fields.isEmpty else { return }
 
         let hosting = NSHostingView(rootView: QLInfoButton(fields: fields))
-        // Layer-backed so SwiftUI renders correctly as a floating subview of NSScrollView.
-        // Frame positioning avoids mixing constraint-based and autoresizing-mask layouts.
         hosting.wantsLayer = true
-        hosting.autoresizingMask = []
-        scrollView.addSubview(hosting)
+        hosting.layer?.backgroundColor = CGColor.clear
+        // .minXMargin + .minYMargin keeps the button pinned to the top-right corner
+        // as the view resizes, without needing repositionInfoOverlay to fire first.
+        hosting.autoresizingMask = [.minXMargin, .minYMargin]
+        hosting.isHidden = true  // Hidden until correctly positioned in viewDidLayout
+        view.addSubview(hosting)  // Sibling of scrollView, not a child — avoids scroll interference
         infoOverlay = hosting
         repositionInfoOverlay()
     }
 
     private func repositionInfoOverlay() {
         guard let overlay = infoOverlay else { return }
+        let bounds = view.bounds
+        guard bounds.width > 0, bounds.height > 0 else { return }
         let size: CGFloat = 44
         let margin: CGFloat = 10
-        // NSScrollView is not flipped — origin is bottom-left.
+        // NSView is not flipped — origin is bottom-left.
         // Top-right corner: x = maxX - size - margin, y = maxY - size - margin.
         overlay.frame = NSRect(
-            x: scrollView.bounds.width - size - margin,
-            y: scrollView.bounds.height - size - margin,
+            x: bounds.width - size - margin,
+            y: bounds.height - size - margin,
             width: size,
             height: size
         )
+        overlay.isHidden = false
     }
 }
 
