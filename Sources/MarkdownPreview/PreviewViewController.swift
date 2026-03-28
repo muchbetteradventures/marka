@@ -14,10 +14,7 @@ class PreviewViewController: NSViewController, @preconcurrency QLPreviewingContr
     private let padding: CGFloat = 32.0
 
     override func loadView() {
-        let container = NSView(frame: NSRect(x: 0, y: 0, width: 600, height: 800))
-        container.autoresizingMask = [.width, .height]
-
-        scrollView = NSScrollView(frame: container.bounds)
+        scrollView = NSScrollView(frame: NSRect(x: 0, y: 0, width: 600, height: 800))
         scrollView.hasVerticalScroller = true
         scrollView.autoresizingMask = [.width, .height]
 
@@ -25,9 +22,7 @@ class PreviewViewController: NSViewController, @preconcurrency QLPreviewingContr
 
         scrollView.documentView = markdownTextView
         scrollView.contentView.postsBoundsChangedNotifications = true
-
-        container.addSubview(scrollView)
-        self.view = container
+        self.view = scrollView
     }
 
     override func viewDidLayout() {
@@ -116,10 +111,11 @@ class PreviewViewController: NSViewController, @preconcurrency QLPreviewingContr
         guard !fields.isEmpty else { return }
 
         let hosting = NSHostingView(rootView: QLInfoButton(fields: fields))
-        // Use frame-based layout to avoid mixing constraint systems with the
-        // scroll view's autoresizingMask layout, which caused scroll-to-top issues.
-        hosting.autoresizingMask = [.minXMargin, .minYMargin]
-        view.addSubview(hosting)
+        // Layer-backed so SwiftUI renders correctly as a floating subview of NSScrollView.
+        // Frame positioning avoids mixing constraint-based and autoresizing-mask layouts.
+        hosting.wantsLayer = true
+        hosting.autoresizingMask = []
+        scrollView.addSubview(hosting)
         infoOverlay = hosting
         repositionInfoOverlay()
     }
@@ -128,10 +124,11 @@ class PreviewViewController: NSViewController, @preconcurrency QLPreviewingContr
         guard let overlay = infoOverlay else { return }
         let size: CGFloat = 44
         let margin: CGFloat = 10
-        // AppKit uses bottom-left origin, so top-right = (maxX - size, maxY - size)
+        // NSScrollView is not flipped — origin is bottom-left.
+        // Top-right corner: x = maxX - size - margin, y = maxY - size - margin.
         overlay.frame = NSRect(
-            x: view.bounds.width - size - margin,
-            y: view.bounds.height - size - margin,
+            x: scrollView.bounds.width - size - margin,
+            y: scrollView.bounds.height - size - margin,
             width: size,
             height: size
         )

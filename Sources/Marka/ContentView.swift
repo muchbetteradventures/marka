@@ -11,8 +11,8 @@ struct ContentView: View {
         let fields = document.frontmatterFields
         return MarkdownNativeView(document: document)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            #if MARKA_DEBUG
             .overlay(alignment: .bottomLeading) {
+                #if MARKA_DEBUG
                 Text("v\(markaVersion) #\(markaBuildNumber)")
                     .font(.system(size: 11, weight: .medium, design: .monospaced))
                     .padding(.horizontal, 8)
@@ -22,8 +22,8 @@ struct ContentView: View {
                     .clipShape(Capsule())
                     .padding(10)
                     .allowsHitTesting(false)
+                #endif
             }
-            #endif
             .toolbar {
                 if !fields.isEmpty {
                     ToolbarItem(placement: .automatic) {
