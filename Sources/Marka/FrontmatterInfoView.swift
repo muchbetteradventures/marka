@@ -118,6 +118,7 @@ private func format(_ date: Date, hasTime: Bool) -> String {
     let fmt = DateFormatter()
     fmt.locale = Locale(identifier: "en_US_POSIX")
     if hasTime {
+        fmt.timeZone = TimeZone(identifier: "UTC")
         fmt.dateFormat = "d MMM yyyy, HH:mm 'UTC'"
     } else {
         fmt.dateFormat = "d MMM yyyy"
