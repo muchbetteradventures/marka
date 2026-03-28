@@ -2,6 +2,7 @@
 set -euo pipefail
 
 # Build, sign, notarize, and install Marka locally for testing.
+# Always builds with MARKA_DEBUG enabled (shows version/build lozenge).
 # Does NOT bump version, tag, push, or update Homebrew.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -26,6 +27,20 @@ APPEX_PATH="${APP_PATH}/Contents/PlugIns/MarkdownPreview.appex"
 INSTALL_PATH="/Applications/Marka.app"
 QL_BUNDLE="com.marka.viewer.preview"
 
+# --- Increment build number ---
+
+BUILD_NUMBER_FILE="${SCRIPT_DIR}/build-number.txt"
+if [[ -f "${BUILD_NUMBER_FILE}" ]]; then
+    BUILD_NUMBER=$(($(cat "${BUILD_NUMBER_FILE}") + 1))
+else
+    BUILD_NUMBER=1
+fi
+echo "${BUILD_NUMBER}" > "${BUILD_NUMBER_FILE}"
+echo "==> Build number: ${BUILD_NUMBER}"
+
+sed -i '' "s/let markaBuildNumber = [0-9]*/let markaBuildNumber = ${BUILD_NUMBER}/" \
+    Sources/Marka/Version.swift
+
 # --- Clean up existing installs ---
 
 echo "==> Removing stale QL extension registrations..."
@@ -48,13 +63,14 @@ rm -rf "${INSTALL_PATH}"
 echo "==> Generating Xcode project..."
 xcodegen generate
 
-# --- Build ---
+# --- Build (with MARKA_DEBUG) ---
 
-echo "==> Building release..."
+echo "==> Building release (debug overlay enabled)..."
 xcodebuild -project Marka.xcodeproj \
     -scheme Marka \
     -configuration Release \
     -derivedDataPath .build/DerivedData \
+    SWIFT_ACTIVE_COMPILATION_CONDITIONS="MARKA_DEBUG" \
     build 2>&1 | grep -E "error:|BUILD SUCCEEDED|BUILD FAILED"
 
 if [[ ! -d "${APP_PATH}" ]]; then
@@ -114,6 +130,6 @@ killall -9 QuickLookUIService 2>/dev/null || true
 qlmanage -r
 
 echo ""
-echo "==> Done. Marka installed to /Applications and QL extension registered."
+echo "==> Done. v${BUILD_NUMBER} installed with debug overlay."
 echo "    Check System Settings → Privacy & Security → Extensions → Quick Look"
 echo "    to confirm 'Markdown Preview' is enabled."

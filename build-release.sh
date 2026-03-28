@@ -52,8 +52,19 @@ esac
 VERSION="${MAJOR}.${MINOR}.${PATCH}"
 echo "==> Version bump: ${CURRENT_VERSION} -> ${VERSION} (${BUMP})"
 
-# Update Version.swift
-sed -i '' "s/markaVersion = \".*\"/markaVersion = \"${VERSION}\"/" Sources/Marka/Version.swift
+# Increment build number
+BUILD_NUMBER_FILE="${SCRIPT_DIR}/build-number.txt"
+if [[ -f "${BUILD_NUMBER_FILE}" ]]; then
+    BUILD_NUMBER=$(($(cat "${BUILD_NUMBER_FILE}") + 1))
+else
+    BUILD_NUMBER=1
+fi
+echo "${BUILD_NUMBER}" > "${BUILD_NUMBER_FILE}"
+echo "==> Build number: ${BUILD_NUMBER}"
+
+# Update Version.swift (version + build number)
+sed -i '' "s/let markaVersion = \".*\"/let markaVersion = \"${VERSION}\"/" Sources/Marka/Version.swift
+sed -i '' "s/let markaBuildNumber = [0-9]*/let markaBuildNumber = ${BUILD_NUMBER}/" Sources/Marka/Version.swift
 
 # Update Info.plists
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${VERSION}" Marka-Info.plist
@@ -62,7 +73,7 @@ sed -i '' "s/markaVersion = \".*\"/markaVersion = \"${VERSION}\"/" Sources/Marka
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${VERSION}" MarkdownPreview-Info.plist
 
 # Commit version bump and tag
-git add Sources/Marka/Version.swift Marka-Info.plist MarkdownPreview-Info.plist
+git add Sources/Marka/Version.swift Marka-Info.plist MarkdownPreview-Info.plist build-number.txt
 git commit -m "release: v${VERSION}"
 git tag "v${VERSION}"
 
@@ -80,6 +91,7 @@ xcodebuild -project "${APP_NAME}.xcodeproj" \
     -scheme "${APP_NAME}" \
     -configuration Release \
     -derivedDataPath .build/DerivedData \
+    SWIFT_ACTIVE_COMPILATION_CONDITIONS="" \
     build
 
 APP_PATH=".build/DerivedData/Build/Products/Release/${APP_NAME}.app"
