@@ -82,14 +82,14 @@ private enum Formatters {
         return f
     }()
 
-    nonisolated(unsafe) static let dateOnly: DateFormatter = {
+    static let dateOnly: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd"
         f.locale = Locale(identifier: "en_US_POSIX")
         return f
     }()
 
-    nonisolated(unsafe) static let displayWithTime: DateFormatter = {
+    static let displayWithTime: DateFormatter = {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
         f.timeZone = TimeZone(identifier: "UTC")
@@ -97,7 +97,7 @@ private enum Formatters {
         return f
     }()
 
-    nonisolated(unsafe) static let displayDateOnly: DateFormatter = {
+    static let displayDateOnly: DateFormatter = {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
         f.dateFormat = "d MMM yyyy"
