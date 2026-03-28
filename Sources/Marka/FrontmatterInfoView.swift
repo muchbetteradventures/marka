@@ -116,9 +116,9 @@ private func parseFlowArray(_ raw: String) -> [String]? {
 
 private func format(_ date: Date, hasTime: Bool) -> String {
     let fmt = DateFormatter()
+    fmt.locale = Locale(identifier: "en_US_POSIX")
     if hasTime {
-        fmt.dateFormat = "d MMM yyyy, HH:mm z"
-        fmt.timeZone = TimeZone(abbreviation: "UTC")
+        fmt.dateFormat = "d MMM yyyy, HH:mm 'UTC'"
     } else {
         fmt.dateFormat = "d MMM yyyy"
     }
