@@ -53,7 +53,7 @@ private struct FieldRow: View {
 
     private func tagsView(_ items: [String]) -> some View {
         HStack(spacing: 4) {
-            ForEach(items, id: \.self) { item in
+            ForEach(Array(items.enumerated()), id: \.offset) { _, item in
                 Text(item)
                     .font(.system(size: 10))
                     .padding(.horizontal, 6)
@@ -75,27 +75,46 @@ private enum FieldValue {
     case text(String)
 }
 
+private enum Formatters {
+    nonisolated(unsafe) static let isoFull: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        return f
+    }()
+
+    nonisolated(unsafe) static let dateOnly: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        return f
+    }()
+
+    nonisolated(unsafe) static let displayWithTime: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "UTC")
+        f.dateFormat = "d MMM yyyy, HH:mm 'UTC'"
+        return f
+    }()
+
+    nonisolated(unsafe) static let displayDateOnly: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "d MMM yyyy"
+        return f
+    }()
+}
+
 private func classify(_ raw: String) -> FieldValue {
-    // ISO 8601 with time: 2013-04-04T15:22:06+00:00 or 2013-04-04T15:22:06Z
-    let isoFull = ISO8601DateFormatter()
-    isoFull.formatOptions = [.withInternetDateTime]
-    if let date = isoFull.date(from: raw) {
+    if let date = Formatters.isoFull.date(from: raw) {
         return .datetime(date, hasTime: true)
     }
-
-    // Date only: 2024-01-15
-    let dateFmt = DateFormatter()
-    dateFmt.dateFormat = "yyyy-MM-dd"
-    dateFmt.locale = Locale(identifier: "en_US_POSIX")
-    if let date = dateFmt.date(from: raw) {
+    if let date = Formatters.dateOnly.date(from: raw) {
         return .datetime(date, hasTime: false)
     }
-
-    // YAML flow array: ["a", "b"] or ["single"]
     if let items = parseFlowArray(raw) {
         return .array(items)
     }
-
     return .text(raw)
 }
 
@@ -115,13 +134,7 @@ private func parseFlowArray(_ raw: String) -> [String]? {
 }
 
 private func format(_ date: Date, hasTime: Bool) -> String {
-    let fmt = DateFormatter()
-    fmt.locale = Locale(identifier: "en_US_POSIX")
-    if hasTime {
-        fmt.timeZone = TimeZone(identifier: "UTC")
-        fmt.dateFormat = "d MMM yyyy, HH:mm 'UTC'"
-    } else {
-        fmt.dateFormat = "d MMM yyyy"
-    }
-    return fmt.string(from: date)
+    hasTime
+        ? Formatters.displayWithTime.string(from: date)
+        : Formatters.displayDateOnly.string(from: date)
 }

@@ -8,10 +8,11 @@ struct ContentView: View {
         // Accessing document.markdown registers this view as a SwiftUI @Observable
         // observer so updateNSView is called when the file changes on disk.
         let _ = document.markdown
-        MarkdownNativeView(document: document)
+        let fields = document.frontmatterFields
+        return MarkdownNativeView(document: document)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .toolbar {
-                if !document.frontmatterFields.isEmpty {
+                if !fields.isEmpty {
                     ToolbarItem(placement: .automatic) {
                         Button {
                             showingInfo.toggle()
@@ -19,7 +20,7 @@ struct ContentView: View {
                             Image(systemName: "info.circle")
                         }
                         .popover(isPresented: $showingInfo) {
-                            FrontmatterInfoView(fields: document.frontmatterFields)
+                            FrontmatterInfoView(fields: fields)
                         }
                         .help("Show document info")
                     }
