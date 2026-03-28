@@ -28,6 +28,7 @@ final class FrontmatterParserTests: XCTestCase {
     func testParseHandlesValueWithColon() {
         let md = "---\ndate: 2013-04-04T15:22:06+00:00\nurl: https://example.com/path\n---\n"
         let result = FrontmatterParser.parse(md)
+        XCTAssertEqual(result.fields.count, 2)
         XCTAssertEqual(result.fields[0].value, "2013-04-04T15:22:06+00:00")
         XCTAssertEqual(result.fields[1].value, "https://example.com/path")
     }
