@@ -143,7 +143,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     path: bundle.markdownFilePath,
                     isTemp: bundle.isTextPack,
                     title: bundle.title,
-                    baseURL: (bundle.assetsPath ?? URL(fileURLWithPath: bundle.markdownFilePath).deletingLastPathComponent()).absoluteString,
+                    baseURL: URL(fileURLWithPath: bundle.markdownFilePath).deletingLastPathComponent().absoluteString,
                     isTextBundle: true,
                     bundlePath: bundle.bundlePath,
                     extractedPath: bundle.extractedPath
@@ -219,7 +219,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 path: bundle.markdownFilePath,
                 isTemp: bundle.isTextPack,
                 title: bundle.title,
-                baseURL: (bundle.assetsPath ?? URL(fileURLWithPath: bundle.markdownFilePath).deletingLastPathComponent()).absoluteString,
+                baseURL: URL(fileURLWithPath: bundle.markdownFilePath).deletingLastPathComponent().absoluteString,
                 isTextBundle: true,
                 bundlePath: bundle.bundlePath,
                 extractedPath: bundle.extractedPath
@@ -322,10 +322,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let scaledTheme = coordinator.applyZoom(to: theme)
 
         // Re-parse and re-render is needed because theme changed
+        let body = FrontmatterParser.body(from: coordinator.lastMarkdown)
         let parser = MarkdownParser()
-        let result = parser.parse(coordinator.lastMarkdown)
+        let result = parser.parse(body)
         let content = MarkdownTextView.PreprocessedContent(parserResult: result, theme: scaledTheme)
-        content.loadedImages = ImageLoader.loadImages(from: coordinator.lastMarkdown, baseURL: coordinator.baseURL)
+        content.loadedImages = ImageLoader.loadImages(from: body, baseURL: coordinator.baseURL)
         let scrollWidth = scrollView.contentView.bounds.width
         var cw = scrollWidth - (coordinator.padding * 2)
         if coordinator.narrowLayout { cw = min(cw, 980) }

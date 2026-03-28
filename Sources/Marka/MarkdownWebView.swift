@@ -60,10 +60,11 @@ struct MarkdownNativeView: NSViewRepresentable {
         let theme = MarkdownGitHubTheme.theme(dark: isDark)
         let scaledTheme = coordinator.applyZoom(to: theme)
 
+        let body = FrontmatterParser.body(from: document.markdown)
         let parser = MarkdownParser()
-        let result = parser.parse(document.markdown)
+        let result = parser.parse(body)
         let content = MarkdownTextView.PreprocessedContent(parserResult: result, theme: scaledTheme)
-        content.loadedImages = ImageLoader.loadImages(from: document.markdown, baseURL: document.baseURL)
+        content.loadedImages = ImageLoader.loadImages(from: body, baseURL: document.baseURL)
 
         let scrollWidth = scrollView.contentView.bounds.width
         var contentWidth = scrollWidth - (coordinator.padding * 2)
@@ -172,10 +173,11 @@ struct MarkdownNativeView: NSViewRepresentable {
             let theme = MarkdownGitHubTheme.theme(dark: isDark)
             let scaledTheme = applyZoom(to: theme)
 
+            let body = FrontmatterParser.body(from: lastMarkdown)
             let parser = MarkdownParser()
-            let result = parser.parse(lastMarkdown)
+            let result = parser.parse(body)
             let content = MarkdownTextView.PreprocessedContent(parserResult: result, theme: scaledTheme)
-            content.loadedImages = ImageLoader.loadImages(from: lastMarkdown, baseURL: baseURL)
+            content.loadedImages = ImageLoader.loadImages(from: body, baseURL: baseURL)
             let scrollWidth = scrollView.contentView.bounds.width
             var cw = scrollWidth - (padding * 2)
             if narrowLayout { cw = min(cw, 980) }

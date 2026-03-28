@@ -47,31 +47,38 @@ class PreviewViewController: NSViewController, @preconcurrency QLPreviewingContr
 
     func preparePreviewOfFile(at url: URL, completionHandler handler: @escaping (Error?) -> Void) {
         do {
-            let markdown: String
+            let rawMarkdown: String
+            var baseURL: URL?
 
             switch url.pathExtension.lowercased() {
             case "md", "markdown", "mdown", "mkd":
-                markdown = try String(contentsOf: url, encoding: .utf8)
+                rawMarkdown = try String(contentsOf: url, encoding: .utf8)
+                baseURL = url.deletingLastPathComponent()
 
             case "textbundle":
-                let content = try TextBundleHandler.load(path: url.path)
-                markdown = content.markdownContent
+                let bundle = try TextBundleHandler.load(path: url.path)
+                rawMarkdown = bundle.markdownContent
+                baseURL = url
 
             case "textpack":
-                let content = try QLTextPackReader.load(url: url)
-                markdown = content.markdown
+                let pack = try QLTextPackReader.load(url: url)
+                rawMarkdown = pack.markdown
+                baseURL = pack.baseURL
 
             default:
                 handler(QLPreviewError.unsupportedFormat)
                 return
             }
 
+            let body = FrontmatterParser.body(from: rawMarkdown)
+
             let isDark = view.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
             let theme = MarkdownGitHubTheme.theme(dark: isDark)
 
             let parser = MarkdownParser()
-            let result = parser.parse(markdown)
+            let result = parser.parse(body)
             let content = MarkdownTextView.PreprocessedContent(parserResult: result, theme: theme)
+            content.loadedImages = ImageLoader.loadImages(from: body, baseURL: baseURL)
             markdownTextView.theme = theme
             markdownTextView.setMarkdownManually(content)
             markdownTextView.bindContentOffset(from: scrollView)

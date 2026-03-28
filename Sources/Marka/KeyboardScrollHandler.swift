@@ -140,7 +140,7 @@ final class KeyboardScrollHandler {
         let id = ObjectIdentifier(markdownTextView)
         if let coordinator = AppDelegate.coordinatorRegistry[id] {
             if headingIndexMarkdown != coordinator.lastMarkdown {
-                headingIndex = HeadingIndex.build(from: markdownTextView, markdown: coordinator.lastMarkdown)
+                headingIndex = HeadingIndex.build(from: markdownTextView, markdown: FrontmatterParser.body(from: coordinator.lastMarkdown))
                 headingIndexMarkdown = coordinator.lastMarkdown
             }
         }
