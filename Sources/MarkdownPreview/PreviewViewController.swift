@@ -14,7 +14,10 @@ class PreviewViewController: NSViewController, @preconcurrency QLPreviewingContr
     private let padding: CGFloat = 32.0
 
     override func loadView() {
-        scrollView = NSScrollView(frame: NSRect(x: 0, y: 0, width: 600, height: 800))
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: 600, height: 800))
+        container.autoresizingMask = [.width, .height]
+
+        scrollView = NSScrollView(frame: container.bounds)
         scrollView.hasVerticalScroller = true
         scrollView.autoresizingMask = [.width, .height]
 
@@ -22,7 +25,9 @@ class PreviewViewController: NSViewController, @preconcurrency QLPreviewingContr
 
         scrollView.documentView = markdownTextView
         scrollView.contentView.postsBoundsChangedNotifications = true
-        self.view = scrollView
+
+        container.addSubview(scrollView)
+        self.view = container
     }
 
     override func viewDidLayout() {
@@ -111,10 +116,10 @@ class PreviewViewController: NSViewController, @preconcurrency QLPreviewingContr
 
         let hosting = NSHostingView(rootView: QLInfoButton(fields: fields))
         hosting.translatesAutoresizingMaskIntoConstraints = false
-        scrollView.addSubview(hosting)
+        view.addSubview(hosting)
         NSLayoutConstraint.activate([
-            hosting.topAnchor.constraint(equalTo: scrollView.topAnchor, constant: 10),
-            hosting.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor, constant: -10),
+            hosting.topAnchor.constraint(equalTo: view.topAnchor, constant: 10),
+            hosting.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -10),
         ])
         infoOverlay = hosting
     }
