@@ -6,7 +6,7 @@ import UniformTypeIdentifiers
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
-    private var windowInfos: [(window: NSWindow, document: MarkdownDocument, watcher: FileWatcher?, tempPath: String?, extractedPath: String?)] = []
+    private var windowInfos: [(window: NSWindow, document: MarkdownDocument, watcher: FileWatcher?, tempPath: String?, extractedPath: String?, filePath: String?)] = []
     private let ipcServer = IPCServer()
     private let initialDocument: IPCPayload?
     private let openAsQLPreview: Bool
@@ -27,6 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             zoomOut: { [weak self] in self?.adjustZoom(delta: -0.1) },
             actualSize: { [weak self] in self?.resetZoom() },
             toggleNarrowLayout: { [weak self] in self?.toggleNarrowLayout() },
+            toggleOpenInTab: { [weak self] in self?.toggleOpenInTab() },
             openDocument: { [weak self] payload in
                 self?.openDocument(payload: payload)
             },
@@ -69,6 +70,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     func openDocument(payload: IPCPayload) {
+        // Canonical path used for deduplication (nil for temp/clipboard files)
+        let canonicalPath: String?
+        if payload.isTemp {
+            canonicalPath = nil
+        } else if payload.isTextBundle, let bundlePath = payload.bundlePath {
+            canonicalPath = bundlePath
+        } else {
+            canonicalPath = payload.path
+        }
+
+        // If already open, focus the existing window instead of creating a new one
+        if let cp = canonicalPath, let existing = windowInfos.first(where: { $0.filePath == cp }) {
+            existing.window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+
         // Track in recent files (skip temp files like clipboard previews)
         if !payload.isTemp {
             RecentFiles.shared.add(payload)
@@ -102,7 +120,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         window.delegate = self
         window.center()
 
-        if let lastWindow = windowInfos.last?.window {
+        let openInTab = UserDefaults.standard.bool(forKey: "openInTab")
+        if openInTab, let existingWindow = windowInfos.last?.window {
+            window.tabbingIdentifier = "marka.main"
+            existingWindow.tabbingIdentifier = "marka.main"
+            existingWindow.addTabbedWindow(window, ordered: .above)
+        } else if let lastWindow = windowInfos.last?.window {
             let origin = lastWindow.cascadeTopLeft(from: .zero)
             window.cascadeTopLeft(from: origin)
         }
@@ -123,7 +146,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             document: document,
             watcher: watcher,
             tempPath: payload.isTemp ? payload.path : nil,
-            extractedPath: payload.extractedPath
+            extractedPath: payload.extractedPath,
+            filePath: canonicalPath
         ))
     }
 
@@ -319,6 +343,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         guard let (coordinator, markdownTextView, scrollView) = coordinatorForKeyWindow() else { return }
         coordinator.zoomLevel = 1.0
         rerender(coordinator: coordinator, markdownTextView: markdownTextView, scrollView: scrollView)
+    }
+
+    private func toggleOpenInTab() {
+        let newValue = !UserDefaults.standard.bool(forKey: "openInTab")
+        UserDefaults.standard.set(newValue, forKey: "openInTab")
     }
 
     private func toggleNarrowLayout() {
