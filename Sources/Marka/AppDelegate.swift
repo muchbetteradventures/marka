@@ -80,8 +80,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             canonicalPath = payload.path
         }
 
-        // If already open, focus the existing window instead of creating a new one
-        if let cp = canonicalPath, let existing = windowInfos.first(where: { $0.filePath == cp }) {
+        if let canonicalPath, let existing = windowInfos.first(where: { $0.filePath == canonicalPath }) {
             existing.window.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             return
