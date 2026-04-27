@@ -12,6 +12,8 @@ A lightweight Markdown viewer for macOS, launched from the terminal. Includes a 
 - QuickLook extension for .md, .textbundle, and .textpack files
 - Find in page, zoom, narrow layout, copy as rich text
 - Keep window on top
+- Open in Tabs mode (View menu) — new files open as tabs instead of separate windows
+- Smart window focus — opening an already-open file focuses the existing window
 
 ## Install
 

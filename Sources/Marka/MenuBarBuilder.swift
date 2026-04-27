@@ -8,6 +8,7 @@ final class MenuBarBuilder: NSObject, NSMenuItemValidation {
     private let zoomOut: () -> Void
     private let actualSize: () -> Void
     private let toggleNarrowLayout: () -> Void
+    private let toggleOpenInTab: () -> Void
     private let openDocument: (IPCPayload) -> Void
     private let showOpenDialog: () -> Void
     private var recentMenu: NSMenu!
@@ -19,6 +20,7 @@ final class MenuBarBuilder: NSObject, NSMenuItemValidation {
         zoomOut: @escaping () -> Void,
         actualSize: @escaping () -> Void,
         toggleNarrowLayout: @escaping () -> Void,
+        toggleOpenInTab: @escaping () -> Void,
         openDocument: @escaping (IPCPayload) -> Void,
         showOpenDialog: @escaping () -> Void
     ) {
@@ -28,6 +30,7 @@ final class MenuBarBuilder: NSObject, NSMenuItemValidation {
         self.zoomOut = zoomOut
         self.actualSize = actualSize
         self.toggleNarrowLayout = toggleNarrowLayout
+        self.toggleOpenInTab = toggleOpenInTab
         self.openDocument = openDocument
         self.showOpenDialog = showOpenDialog
         super.init()
@@ -92,6 +95,9 @@ final class MenuBarBuilder: NSObject, NSMenuItemValidation {
         narrowLayoutItem.keyEquivalentModifierMask = [.command, .shift]
         narrowLayoutItem.target = self
         viewMenu.addItem(narrowLayoutItem)
+        let openInTabItem = NSMenuItem(title: "Open in Tabs", action: #selector(doToggleOpenInTab), keyEquivalent: "")
+        openInTabItem.target = self
+        viewMenu.addItem(openInTabItem)
         viewMenu.addItem(.separator())
         let actualSizeItem = NSMenuItem(title: "Actual Size", action: #selector(doActualSize), keyEquivalent: "0")
         actualSizeItem.target = self
@@ -125,6 +131,7 @@ final class MenuBarBuilder: NSObject, NSMenuItemValidation {
     @objc private func doZoomOut() { zoomOut() }
     @objc private func doActualSize() { actualSize() }
     @objc private func doToggleNarrowLayout() { toggleNarrowLayout() }
+    @objc private func doToggleOpenInTab() { toggleOpenInTab() }
 
     @objc private func toggleKeepOnTop() {
         guard let window = NSApp.keyWindow else { return }
@@ -162,6 +169,10 @@ final class MenuBarBuilder: NSObject, NSMenuItemValidation {
         }
         if menuItem.action == #selector(doToggleNarrowLayout) {
             menuItem.state = UserDefaults.standard.bool(forKey: "narrowLayout") ? .on : .off
+            return true
+        }
+        if menuItem.action == #selector(doToggleOpenInTab) {
+            menuItem.state = UserDefaults.standard.bool(forKey: "openInTab") ? .on : .off
             return true
         }
         return true
