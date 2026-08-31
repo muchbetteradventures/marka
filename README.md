@@ -59,4 +59,4 @@ The main app uses a WKWebView with GitHub-flavoured CSS and highlight.js for syn
 
 ## License
 
-MIT
+MIT © 2026 Gentiane Solutions Ltd (t/a Much Better Adventures). See [LICENSE](LICENSE) for details.
